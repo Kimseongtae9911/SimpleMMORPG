@@ -1,0 +1,436 @@
+#include "pch.h"
+#include "CScene.h"
+#include "CObject.h"
+
+extern sf::Font g_font;
+
+CUserInterface::CUserInterface()
+{
+	//set levelname
+	m_levelText.setFont(g_font);
+	m_levelText.setFillColor(sf::Color(255, 255, 255));
+	m_levelText.setPosition({ WINDOW_WIDTH + 45.f, 20.f });
+	m_levelText.setCharacterSize(20);
+	m_levelText.setStyle(sf::Text::Bold);
+
+	//set hp interface
+	m_barBG.setSize({ 100.f, 15.f });
+	m_barBG.setFillColor(sf::Color(50, 50, 50, 200));
+	m_barBG.setPosition({WINDOW_WIDTH + 30.f, 70.f});
+
+	m_hpBar.setSize({ 100.f, 15.f });
+	m_hpBar.setFillColor(sf::Color(250, 50, 50, 200));
+	m_hpBar.setPosition({ WINDOW_WIDTH + 30.f, 70.f });
+
+	m_hpText.setFont(g_font);
+	m_hpText.setFillColor(sf::Color(255, 255, 255));
+	m_hpText.setPosition({ WINDOW_WIDTH + 30.f, 65.f });
+	m_hpText.setCharacterSize(16);
+	m_hpText.setStyle(sf::Text::Bold);
+
+	//set mp interface
+	m_mpBar.setSize({ 100.f, 15.f });
+	m_mpBar.setFillColor(sf::Color(50, 50, 250, 200));
+	m_mpBar.setPosition({ WINDOW_WIDTH + 30.f, 95.f });
+
+	m_mpText.setFont(g_font);
+	m_mpText.setFillColor(sf::Color(255, 255, 255));
+	m_mpText.setPosition({ WINDOW_WIDTH + 30.f, 90.f });
+	m_mpText.setCharacterSize(16);
+	m_mpText.setStyle(sf::Text::Bold);
+
+	//set exp interface
+	m_expBar.setSize({ 100.f, 15.f });
+	m_expBar.setFillColor(sf::Color(50, 250, 50, 200));
+	m_expBar.setPosition({ WINDOW_WIDTH + 30.f, 120.f });
+
+	m_expText.setFont(g_font);
+	m_expText.setFillColor(sf::Color(255, 255, 255));
+	m_expText.setPosition({ WINDOW_WIDTH + 50.f, 132.f });
+	m_expText.setCharacterSize(13);
+	m_expText.setStyle(sf::Text::Bold);
+	m_expText.setString("50/100");
+	defaultpos = m_expText.getGlobalBounds().width;
+
+	m_expText2.setFont(g_font);
+	m_expText2.setFillColor(sf::Color(255, 255, 255));
+	m_expText2.setPosition({ WINDOW_WIDTH + 60.f, 115.f });
+	m_expText2.setCharacterSize(16);
+	m_expText2.setStyle(sf::Text::Bold);
+	m_expText2.setString("EXP");
+
+	//set skill
+	m_skillTex.loadFromFile("Resource/Skill.png");
+	m_skill.setSize({ 96, 32 });
+	m_skill.setTexture(&m_skillTex);
+	m_skill.setTextureRect(sf::Rect(32, 0, TILE_WIDTH * 3, TILE_WIDTH));
+	m_skill.setPosition(WINDOW_WIDTH + 25.f, 190.f);
+
+	for (int i = 0; i < m_usedskill.size(); ++i) {
+		m_usedskill[i].setFillColor(sf::Color(0, 0, 0, 180));
+		m_usedskill[i].setSize({ 32, 32 });
+		m_usedskill[i].setPosition(WINDOW_WIDTH + 25.f + i * TILE_WIDTH, 190.f);
+	}
+
+	m_skillText.setFont(g_font);
+	m_skillText.setFillColor(sf::Color(255, 255, 255));
+	m_skillText.setPosition({ WINDOW_WIDTH + 45.f, 170.f });
+	m_skillText.setCharacterSize(20);
+	m_skillText.setStyle(sf::Text::Bold);
+	m_skillText.setString("SKILL");
+
+	//set Item
+	m_itemConTex.loadFromFile("Resource/ItemContainer.png");
+	m_itemCon.setSize({ 108, 73 });
+	m_itemCon.setTexture(&m_itemConTex);
+	m_itemCon.setTextureRect(sf::Rect(0, 0, 108, 73));
+	m_itemCon.setPosition(WINDOW_WIDTH + 25.f, 270.f);
+
+	m_itemText.setFont(g_font);
+	m_itemText.setFillColor(sf::Color(255, 255, 255));
+	m_itemText.setPosition({ WINDOW_WIDTH + 52.f, 250.f });
+	m_itemText.setCharacterSize(20);
+	m_itemText.setStyle(sf::Text::Bold);
+	m_itemText.setString("ITEM");
+
+	//set attack
+	m_attack.setSize({ 32, 32 });
+	m_attack.setTexture(&m_skillTex);
+	m_attack.setTextureRect(sf::Rect(0, 0, TILE_WIDTH, TILE_WIDTH));
+	m_attack.setPosition(WINDOW_WIDTH + 59.f, 380.f);
+
+	m_attackcool.setFillColor(sf::Color(0, 0, 0, 180));
+	m_attackcool.setSize({ 32, 32 });
+	m_attackcool.setPosition(WINDOW_WIDTH + 55.f, 380.f);
+
+	m_attackText.setFont(g_font);
+	m_attackText.setFillColor(sf::Color(255, 255, 255));
+	m_attackText.setPosition({ WINDOW_WIDTH + 43.f, 360.f });
+	m_attackText.setCharacterSize(20);
+	m_attackText.setStyle(sf::Text::Bold);
+	m_attackText.setString("ATTACK");
+}
+
+CUserInterface::~CUserInterface()
+{
+}
+
+void CUserInterface::UpdateHp(int maxhp, int curhp)
+{
+	float percent = static_cast<float>(curhp) / static_cast<float>(maxhp) * 100;
+	int p = static_cast<int>(percent);
+	m_hpBar.setSize(sf::Vector2f(p, m_hpBar.getSize().y));
+
+	string s = "HP:";
+	s += to_string(curhp);
+	m_hpText.setString(s);
+}
+
+void CUserInterface::UpdateMp(int maxmp, int curmp)
+{
+	float percent = static_cast<float>(curmp) / static_cast<float>(maxmp) * 100;
+	int p = static_cast<int>(percent);
+	m_mpBar.setSize(sf::Vector2f(p, m_mpBar.getSize().y));
+
+	string s = "MP:";
+	s += to_string(curmp);
+	m_mpText.setString(s);
+}
+
+void CUserInterface::UpdateExp(int maxexp, int curexp)
+{
+	float percent = static_cast<float>(curexp) / static_cast<float>(maxexp) * 100;
+	int p = static_cast<int>(percent);
+	m_expBar.setSize(sf::Vector2f(p, m_expBar.getSize().y));
+
+	string s = to_string(curexp);
+	s += "/";
+	s += to_string(maxexp);
+	m_expText.setString(s);
+	
+	m_expText.setPosition({ m_expText.getPosition().x - (m_expText.getGlobalBounds().width - defaultpos) / 2, m_expText.getPosition().y});
+}
+
+void CUserInterface::UpdateLevel(int level)
+{
+	string s = "LV:";
+	s += to_string(level);
+	m_levelText.setString(s);
+}
+
+void CUserInterface::Render(sf::RenderWindow& RW)
+{
+	//Render level
+	RW.draw(m_levelText);
+
+	//Render hp
+	m_barBG.setPosition({ WINDOW_WIDTH + 30.f, 70.f });
+	RW.draw(m_barBG);
+	RW.draw(m_hpBar);
+	RW.draw(m_hpText);
+
+	//Render mp
+	m_barBG.setPosition({ WINDOW_WIDTH + 30.f, 95.f });
+	RW.draw(m_barBG);
+	RW.draw(m_mpBar);
+	RW.draw(m_mpText);
+
+	//Render exp
+	m_barBG.setPosition({ WINDOW_WIDTH + 30.f, 120.f });
+	RW.draw(m_barBG);
+	RW.draw(m_expBar);
+	RW.draw(m_expText2);
+	RW.draw(m_expText);
+
+	//Render skill
+	RW.draw(m_skillText);
+	RW.draw(m_skill);
+	for (int i = 0; i < m_usedskill.size(); ++i) {
+		RW.draw(m_usedskill[i]);
+	}
+
+	//Render item
+	RW.draw(m_itemText);
+	RW.draw(m_itemCon);
+
+	//Render Attack
+	RW.draw(m_attackText);
+	RW.draw(m_attack);
+	RW.draw(m_attackcool);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+CScene::CScene()
+{
+	m_interface = make_unique<CUserInterface>();
+	m_mapTile = new sf::Texture;
+	m_character = new sf::Texture;
+	m_items = new sf::Texture;
+	m_skills = new sf::Texture;
+	m_enemy = new sf::Texture;
+
+	m_mapTile->loadFromFile("Resource/MapTiles.png");
+	m_character->loadFromFile("Resource/Character.png");
+	m_items->loadFromFile("Resource/Item.png");
+	m_skills->loadFromFile("Resource/Skill.png");
+
+	m_avatar = new CPlayer{ *m_character, 0, 64, 32, 32};
+	m_avatar->set_name("Test");
+
+	m_players = new CMoveObject*[MAX_USER + MAX_NPC];
+
+	for (int i = 0; i < MAX_USER + MAX_NPC; ++i) {
+		if (i < MAX_USER) {
+			m_players[i] = new CPlayer{ *m_character, 0, 64, 32, 32};
+			m_players[i]->hide();
+		}
+		else {
+			m_players[i] = new CNpc{ *m_enemy, 0, 64, 32, 32};
+			m_players[i]->hide();
+		}
+	}
+
+	m_water_tile = new CObject{ *m_mapTile, 0, 0, 32, 32};
+	m_grass_tile = new CObject{ *m_mapTile, 0, 32, 32, 32};
+	m_rock_tile = new CObject{ *m_mapTile, 128, 0, 32, 32};
+	m_tree_tile = new CObject{ *m_mapTile, 128, 32, 32, 32};
+	m_dirt_tile = new CObject{ *m_mapTile, 32, 0, 32, 32};
+	m_lake_tile = new CObject{ *m_mapTile, 128, 64, 32, 32};
+	m_fire_tile = new CObject{ *m_mapTile, 0, 64, 32, 32};
+
+	fstream in("Resource/Map.txt");
+	for (int i = 0; i < 100; ++i) {
+		for (int j = 0; j < 100; ++j) {
+			char c;
+			in >> c;
+			m_tilemap[i][j] = c;
+		}
+	}
+
+	for (int k = 0; k < 100; ++k) {
+		for (int i = 1; i < 20; ++i) {
+			for (int j = 0; j < 100; ++j) {
+				m_tilemap[k][i * 100 + j] = m_tilemap[k][j];
+			}
+		}
+	}
+
+	for (int k = 100; k < W_HEIGHT; ++k) {
+		for (int i = 0; i < 20; ++i) {
+			for (int j = 0; j < 100; ++j) {
+				m_tilemap[k][i * 100 + j] = m_tilemap[k - 100][j];
+			}
+		}
+	}
+}
+
+CScene::~CScene()
+{
+	delete m_mapTile;
+	delete m_character;
+	delete m_enemy;
+	delete m_items;
+	delete m_skills;
+}
+
+void CScene::Update()
+{
+}
+
+void CScene::Render(sf::RenderWindow& RW)
+{
+	for (int i = 0; i < SCREEN_HEIGHT; ++i) {
+		for (int j = 0; j < SCREEN_WIDTH; ++j) {
+			int tile_x = j + m_left;
+			int tile_y = i + m_top;
+			if ((tile_x < 0) || (tile_y < 0))
+				continue;
+			switch (m_tilemap[tile_y][tile_x]) {
+			case 'G':
+				m_grass_tile->a_move(TILE_WIDTH * j + 7, TILE_WIDTH * i + 7);
+				m_grass_tile->a_draw(RW);
+				break;
+			case 'D':
+				m_dirt_tile->a_move(TILE_WIDTH * j + 7, TILE_WIDTH * i + 7);
+				m_dirt_tile->a_draw(RW);
+				break;
+			case 'R':
+				m_dirt_tile->a_move(TILE_WIDTH * j + 7, TILE_WIDTH * i + 7);
+				m_dirt_tile->a_draw(RW);
+				m_rock_tile->a_move(TILE_WIDTH * j + 7, TILE_WIDTH * i + 7);
+				m_rock_tile->a_draw(RW);
+				break;
+			case 'W':
+				m_water_tile->a_move(TILE_WIDTH * j + 7, TILE_WIDTH * i + 7);
+				m_water_tile->a_draw(RW);
+				break;
+			case 'L':
+				m_lake_tile->a_move(TILE_WIDTH * j + 7, TILE_WIDTH * i + 7);
+				m_lake_tile->a_draw(RW);
+				break;
+			case 'T':
+				m_grass_tile->a_move(TILE_WIDTH * j + 7, TILE_WIDTH * i + 7);
+				m_grass_tile->a_draw(RW);
+				m_tree_tile->a_move(TILE_WIDTH * j + 7, TILE_WIDTH * i + 7);
+				m_tree_tile->a_draw(RW);
+				break;
+			case 'F':
+				m_grass_tile->a_move(TILE_WIDTH * j + 7, TILE_WIDTH * i + 7);
+				m_grass_tile->a_draw(RW);
+				m_fire_tile->a_move(TILE_WIDTH * j + 7, TILE_WIDTH * i + 7);
+				m_fire_tile->a_draw(RW);
+				break;
+			}
+		}
+	}
+	m_avatar->draw(RW, m_left, m_top);
+	for (int i = 0; i < MAX_USER + MAX_NPC; ++i) {
+		if(m_players[i] != NULL)
+			m_players[i]->draw(RW, m_left, m_top);
+	}
+
+	sf::Text text;
+	text.setFont(g_font);
+	char buf[100];
+	sprintf_s(buf, "(%d, %d)", m_avatar->m_x, m_avatar->m_y);
+	text.setString(buf);
+	RW.draw(text);
+
+	m_interface->Render(RW);
+}
+
+void CScene::ProcessLoginInfoPacket(char* ptr)
+{
+	SC_LOGIN_INFO_PACKET* packet = reinterpret_cast<SC_LOGIN_INFO_PACKET*>(ptr);	
+	m_id = packet->id;
+	m_avatar->m_id = m_id;
+	m_avatar->move(packet->x, packet->y);
+	m_left = packet->x - 8;
+	m_top = packet->y - 8;
+	m_avatar->set_name(packet->name);
+	m_avatar->SetCurHp(packet->hp);
+	m_avatar->SetMaxHp(packet->max_hp);
+	m_avatar->SetExp(packet->exp);
+	m_avatar->SetLevel(packet->level);
+	m_avatar->show();
+
+	m_interface->UpdateHp(packet->max_hp, packet->hp);
+	m_interface->UpdateLevel(packet->level);
+	m_interface->UpdateExp(1000, 190);
+	m_interface->UpdateMp(100, 100);
+}
+
+void CScene::ProcessAddObjectPacket(char* ptr)
+{
+	SC_ADD_OBJECT_PACKET* my_packet = reinterpret_cast<SC_ADD_OBJECT_PACKET*>(ptr);
+	int id = my_packet->id;
+
+	if (id == m_id) {
+		m_avatar->move(my_packet->x, my_packet->y);
+		m_left = my_packet->x - 8;
+		m_top = my_packet->y - 8;
+		m_avatar->show();
+	}
+	else if (id < MAX_USER) {
+		//m_players[id] = new CObject{ *m_character, 0, 64, 32, 32};
+		m_players[id]->m_id = id;
+		m_players[id]->move(my_packet->x, my_packet->y);
+		m_players[id]->set_name(my_packet->name);
+		m_players[id]->show();
+	}
+	else {
+		//m_players[id] = new CObject{ *m_enemy, 0, 64, 32, 32};
+		m_players[id]->m_id = id;
+		m_players[id]->move(my_packet->x, my_packet->y);
+		char newname[NAME_SIZE] = { 'N', 'P', 'C' };
+		strcat_s(newname, my_packet->name);
+		m_players[id]->set_name(newname);
+		m_players[id]->show();
+	}
+}
+
+void CScene::ProcessMoveObjectPacket(char* ptr)
+{
+	SC_MOVE_OBJECT_PACKET* my_packet = reinterpret_cast<SC_MOVE_OBJECT_PACKET*>(ptr);
+	int other_id = my_packet->id;
+	if (other_id == m_id) {
+		m_avatar->move(my_packet->x, my_packet->y);
+		m_left = my_packet->x - 8;
+		m_top = my_packet->y - 8;
+		/*g_left_x = my_packet->x - SCREEN_WIDTH / 2;
+		g_top_y = my_packet->y - SCREEN_HEIGHT / 2;*/
+	}
+	else {
+		m_players[other_id]->move(my_packet->x, my_packet->y);
+	}
+}
+
+void CScene::ProcessRemoveObjectPacket(char* ptr)
+{
+	SC_REMOVE_OBJECT_PACKET* my_packet = reinterpret_cast<SC_REMOVE_OBJECT_PACKET*>(ptr);
+	int other_id = my_packet->id;
+	if (other_id == m_id) {
+		m_avatar->hide();
+	}
+	else {
+		m_players[other_id]->hide();
+	}
+}
+
+void CScene::ProcessChatPacket(char* ptr)
+{
+	SC_CHAT_PACKET* my_packet = reinterpret_cast<SC_CHAT_PACKET*>(ptr);
+	int other_id = my_packet->id;
+	if (other_id == m_id) {
+		m_avatar->set_chat(my_packet->mess);
+	}
+	else {
+		m_players[other_id]->set_chat(my_packet->mess);
+	}
+}
+
+void CScene::ChangeAvartarTex(int x, int y, int x2, int y2)
+{
+	m_avatar->ChangeTex(x, y, x2, y2);
+}
