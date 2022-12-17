@@ -401,8 +401,8 @@ void CScene::ProcessLoginInfoPacket(char* ptr)
 
 	m_interface->UpdateHp(packet->max_hp, packet->hp);
 	m_interface->UpdateLevel(packet->level);
-	m_interface->UpdateExp(1000, 190);
-	m_interface->UpdateMp(100, 100);
+	m_interface->UpdateExp(INIT_EXP + (packet->level-1) * EXP_UP, packet->exp);
+	m_interface->UpdateMp(packet->max_mp, packet->mp);
 }
 
 void CScene::ProcessAddObjectPacket(char* ptr)
@@ -500,6 +500,16 @@ void CScene::ProcessDamagePacket(char* ptr)
 	SC_DAMAGE_PACKET* packet = reinterpret_cast<SC_DAMAGE_PACKET*>(ptr);
 	m_objects[packet->id]->SetCurHp(packet->hp);
 	dynamic_cast<CNpc*>(m_objects[packet->id])->UpdateHPBar();
+}
+
+void CScene::ProcessStatChangePacket(char* ptr)
+{
+	SC_STAT_CHANGE_PACKET* p = reinterpret_cast<SC_STAT_CHANGE_PACKET*>(ptr);
+
+	m_interface->UpdateLevel(p->level);
+	m_interface->UpdateHp(p->max_hp, p->hp);
+	m_interface->UpdateMp(p->max_mp, p->mp);
+	m_interface->UpdateExp(INIT_EXP + (p->level-1) * EXP_UP, p->exp);
 }
 
 void CScene::ChangeAvartarTex(int x, int y, int x2, int y2)

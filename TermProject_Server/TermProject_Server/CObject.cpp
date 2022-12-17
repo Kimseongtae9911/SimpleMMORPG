@@ -67,6 +67,9 @@ void CObject::Send_AddObject_Packet(int c_id)
 		add_packet.level = clients[c_id]->GetLevel();
 		add_packet.hp = clients[c_id]->GetCurHp();
 		add_packet.max_hp = clients[c_id]->GetMaxHp();
+		if (add_packet.hp <= 0) {
+			return;
+		}
 	}
 	else {
 		add_packet.level = 0;
@@ -173,6 +176,8 @@ void CPlayer::Send_LoginInfo_Packet()
 
 	p.max_hp = m_maxHp;
 	p.hp = m_curHp;
+	p.max_mp = m_maxMp;
+	p.mp = m_curMp;
 	p.exp = m_exp;
 	p.level = m_level;
 	strcpy_s(p.name, m_Name);
@@ -213,6 +218,36 @@ void CPlayer::Attack()
 			p.hp = clients[cid]->GetCurHp() - m_power;
 			clients[cid]->SetCurHp(p.hp);
 			SendPacket(&p);
+
+			if (clients[cid]->GetCurHp() <= 0.f) {
+				dynamic_cast<CNpc*>(clients[cid])->m_active = false;
+				Send_RemoveObject_Packet(cid);
+				GainExp(clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2);
+				SC_STAT_CHANGE_PACKET packet;
+				packet.size = sizeof(packet);
+				packet.type = SC_STAT_CHANGE;
+				packet.max_hp = m_maxHp;
+				packet.hp = m_curHp;
+				packet.max_mp = m_maxMp;
+				packet.mp = m_curMp;
+				packet.level = m_level;
+				packet.exp = m_exp;
+				SendPacket(&packet);
+			}
 		}
+	}	
+}
+
+void CPlayer::GainExp(int exp)
+{
+	m_exp += exp;
+	if (m_exp >= m_maxExp) {
+		m_exp -= m_maxExp;
+		m_level++;
+		m_maxExp = INIT_EXP + (m_level-1) * EXP_UP;
+		m_maxHp = m_level * 100;
+		m_curHp = m_maxHp;
+		m_maxMp = m_level * 50;
+		m_curMp = m_maxMp;
 	}
 }

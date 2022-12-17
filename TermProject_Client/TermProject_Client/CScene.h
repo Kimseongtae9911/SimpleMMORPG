@@ -67,6 +67,7 @@ public:
 	void ProcessRemoveObjectPacket(char* ptr);
 	void ProcessChatPacket(char* ptr);
 	void ProcessDamagePacket(char* ptr);
+	void ProcessStatChangePacket(char* ptr);
 
 	void ChangeAvartarTex(int x, int y, int x2, int y2);
 	void SetSkillOnOff(int skill, bool type);

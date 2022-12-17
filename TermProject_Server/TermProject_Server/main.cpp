@@ -50,9 +50,12 @@ void process_packet(int c_id, char* packet)
 			{
 				lock_guard<mutex> ll{ clients[c_id]->m_StateLock };
 				clients[c_id]->SetPos(user_info->pos_x, user_info->pos_y);
-				clients[c_id]->SetMaxHp(user_info->max_hp);
 				clients[c_id]->SetLevel(user_info->level);
+				clients[c_id]->SetMaxHp(user_info->max_hp);
 				clients[c_id]->SetCurHp(user_info->cur_hp);
+				dynamic_cast<CPlayer*>(clients[c_id])->SetMaxExp(INIT_EXP + (user_info->level - 1) * EXP_UP);
+				dynamic_cast<CPlayer*>(clients[c_id])->SetMaxMp(user_info->max_mp);
+				dynamic_cast<CPlayer*>(clients[c_id])->SetMp(user_info->cur_mp);
 				clients[c_id]->SetState(CL_STATE::ST_INGAME);
 			}
 
@@ -384,12 +387,14 @@ void timer_func()
 				this_thread::sleep_for(1ms);
 				continue;
 			}
-			switch (ev.event_id) {
-			case EV_RANDOM_MOVE:
-				OVER_EXP* ov = new OVER_EXP;
-				ov->m_comp_type = OP_TYPE::OP_NPC_MOVE;
-				PostQueuedCompletionStatus(h_iocp, 1, ev.obj_id, &ov->m_over);
-				break;
+			if (clients[ev.obj_id]->GetCurHp() > 0.f) {
+				switch (ev.event_id) {
+				case EV_RANDOM_MOVE:
+					OVER_EXP* ov = new OVER_EXP;
+					ov->m_comp_type = OP_TYPE::OP_NPC_MOVE;
+					PostQueuedCompletionStatus(h_iocp, 1, ev.obj_id, &ov->m_over);
+					break;
+				}
 			}
 			timer_queue.try_pop(ev);
 			continue;

@@ -103,5 +103,8 @@ void CNpc::draw(sf::RenderWindow& RW, int left, int top)
 void CNpc::UpdateHPBar()
 {
 	float percent = static_cast<float>(m_curHP) / static_cast<float>(m_maxHP);
-	m_hpBar.setSize({m_hpBar.getSize().x * percent, m_hpBar.getSize().y});
+	m_hpBar.setSize({m_barBG.getSize().x * percent, m_hpBar.getSize().y});
+	if (m_hpBar.getSize().x <= 0.f) {
+		hide();
+	}
 }

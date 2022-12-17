@@ -51,10 +51,10 @@ bool CDatabase::Initialize()
 char* CDatabase::GetPlayerInfo(string name)
 {
     // player_name, pos_x, pos_y, player_level, player_exp, player_maxhp, player_hp
-    SQLINTEGER user_level = -1, user_exp = -1, user_maxhp = -1, user_hp = -1;
+    SQLINTEGER user_level = -1, user_exp = -1, user_maxhp = -1, user_hp = -1, user_maxmp = -1, user_mp = -1;
     SQLSMALLINT user_pos_x = -1, user_pos_y = -1;
     SQLWCHAR user_name[NAME_SIZE + 1] = { '\0' };
-    SQLLEN cb_pos_x = 0, cb_pos_y = 0, cb_name = 0, cb_level = 0, cb_exp = 0, cb_maxhp = 0, cb_hp = 0;
+    SQLLEN cb_pos_x = 0, cb_pos_y = 0, cb_name = 0, cb_level = 0, cb_exp = 0, cb_maxhp = 0, cb_hp = 0, cb_maxmp = 0, cb_mp = 0;
 
     string temp = "EXEC get_user_data " + name;
     wstring sql;
@@ -72,13 +72,15 @@ char* CDatabase::GetPlayerInfo(string name)
         retcode = SQLBindCol(m_hstmt, 5, SQL_C_LONG, &user_exp, sizeof(int), &cb_exp);
         retcode = SQLBindCol(m_hstmt, 6, SQL_C_LONG, &user_maxhp, sizeof(int), &cb_maxhp);
         retcode = SQLBindCol(m_hstmt, 7, SQL_C_LONG, &user_hp, sizeof(int), &cb_hp);
+        retcode = SQLBindCol(m_hstmt, 8, SQL_C_LONG, &user_maxmp, sizeof(int), &cb_maxmp);
+        retcode = SQLBindCol(m_hstmt, 9, SQL_C_LONG, &user_mp, sizeof(int), &cb_mp);
 
         retcode = SQLFetch(m_hstmt);
         if (retcode == SQL_ERROR || retcode == SQL_SUCCESS_WITH_INFO)
             Show_Error(m_hstmt, SQL_HANDLE_STMT, retcode);
         if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO)
         {
-            wprintf(L"%s %3d %3d %3d %3d %3d %3d\n", user_name, user_pos_x, user_pos_y, user_level, user_exp, user_maxhp, user_hp);
+            wprintf(L"%s %3d %3d %3d %3d %3d %3d %3d %3d\n", user_name, user_pos_x, user_pos_y, user_level, user_exp, user_maxhp, user_hp, user_maxmp, user_mp);
            
             strcpy_s(user_info->name, (char*)user_name);
             user_info->pos_x = user_pos_x;
@@ -87,6 +89,8 @@ char* CDatabase::GetPlayerInfo(string name)
             user_info->exp = user_exp;
             user_info->max_hp = user_maxhp;
             user_info->cur_hp = user_hp;
+            user_info->max_mp = user_maxmp;
+            user_info->cur_mp = user_mp;
         }
         else {
             if (user_name[0] == '\0') {
@@ -96,6 +100,8 @@ char* CDatabase::GetPlayerInfo(string name)
                 user_info->exp = -1;
                 user_info->max_hp = -1;
                 user_info->cur_hp = -1;
+                user_info->max_mp = -1;
+                user_info->cur_mp = -1;
             }
         }
 

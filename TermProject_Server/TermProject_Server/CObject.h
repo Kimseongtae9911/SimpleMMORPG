@@ -113,6 +113,9 @@ public:
 	virtual ~CPlayer();
 
 	void SetExp(const int exp) { m_exp = exp; }
+	void SetMaxExp(const int exp) { m_maxExp = exp; }
+	void SetMaxMp(const int mp) { m_maxMp = mp; }
+	void SetMp(const int mp) { m_curMp = mp; }
 	void SetUsedTime(const int index, const chrono::system_clock::time_point time) { m_usedTime[index] = time; }
 
 	const int GetExp() const { return m_exp; }
@@ -122,9 +125,13 @@ public:
 	void Send_LoginInfo_Packet();
 
 	void Attack();
+	void GainExp(int exp);
 
 private:
+	int m_maxExp;
 	int m_exp;
+	int m_maxMp;
+	int m_curMp;
 	int m_power;
 	array<chrono::system_clock::time_point, 4> m_usedTime;
 };

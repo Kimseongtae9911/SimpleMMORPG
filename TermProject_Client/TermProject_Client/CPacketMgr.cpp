@@ -93,6 +93,9 @@ void CPacketMgr::ProcessPacket(char* ptr)
 	case SC_DAMAGE:
 		m_scene->ProcessDamagePacket(ptr);
 		break;
+	case SC_STAT_CHANGE:
+		m_scene->ProcessStatChangePacket(ptr);
+		break;
 	default:
 		printf("Unknown PACKET type [%d]\n", ptr[1]);
 	}

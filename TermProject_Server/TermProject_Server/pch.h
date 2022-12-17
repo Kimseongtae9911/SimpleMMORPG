@@ -24,6 +24,8 @@ extern "C" {
 using namespace std;
 
 constexpr int VIEW_RANGE = 7;
+constexpr int INIT_EXP = 10;
+constexpr int EXP_UP = 40;
 
 enum class OP_TYPE { OP_ACCEPT, OP_RECV, OP_SEND, OP_NPC_MOVE, OP_AI_HELLO };
 
@@ -44,12 +46,14 @@ struct TIMER_EVENT {
 
 #pragma pack (push, 1)
 struct USER_INFO {
-	char name[NAME_SIZE + 1];
 	int max_hp;
 	int cur_hp;
+	int max_mp;
+	int cur_mp;
 	int level;
 	int exp;
 	short pos_x;
 	short pos_y;
+	char name[NAME_SIZE + 1];
 };
 #pragma pack (pop)

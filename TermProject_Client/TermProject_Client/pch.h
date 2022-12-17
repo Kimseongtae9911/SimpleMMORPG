@@ -38,3 +38,6 @@ constexpr auto SCREEN_HEIGHT = 20;
 constexpr auto TILE_WIDTH = 32;
 constexpr auto WINDOW_WIDTH = SCREEN_WIDTH * TILE_WIDTH;
 constexpr auto WINDOW_HEIGHT = SCREEN_WIDTH * TILE_WIDTH;
+
+constexpr int INIT_EXP = 10;
+constexpr int EXP_UP = 40;
