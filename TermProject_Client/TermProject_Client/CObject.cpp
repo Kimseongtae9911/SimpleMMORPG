@@ -8,7 +8,6 @@ CObject::CObject(sf::Texture& t, int x, int y, int x2, int y2)
 	m_showing = false;
 	m_sprite.setTexture(t);
 	m_sprite.setTextureRect(sf::IntRect(x, y, x2, y2));
-	//set_name("-1");
 	m_mess_end_time = chrono::system_clock::now();
 }
 

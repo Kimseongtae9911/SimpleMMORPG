@@ -41,3 +41,5 @@ constexpr auto WINDOW_HEIGHT = SCREEN_WIDTH * TILE_WIDTH;
 
 constexpr int INIT_EXP = 10;
 constexpr int EXP_UP = 40;
+
+enum class DIR {LEFT, RIGHT, UP, DOWN};

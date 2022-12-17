@@ -147,6 +147,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="CEffect.cpp" />
     <ClCompile Include="CFramework.cpp" />
     <ClCompile Include="CObject.cpp" />
     <ClCompile Include="CPacketMgr.cpp" />
@@ -154,6 +155,7 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CEffect.h" />
     <ClInclude Include="CFramework.h" />
     <ClInclude Include="CObject.h" />
     <ClInclude Include="CPacketMgr.h" />

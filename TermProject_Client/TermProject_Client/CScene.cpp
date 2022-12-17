@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "CScene.h"
 #include "CObject.h"
+#include "CEffect.h"
 
 extern sf::Font g_font;
 
@@ -148,7 +149,9 @@ void CUserInterface::UpdateExp(int maxexp, int curexp)
 	s += to_string(maxexp);
 	m_expText.setString(s);
 	
-	m_expText.setPosition({ m_expText.getPosition().x - (m_expText.getGlobalBounds().width - defaultpos) / 2, m_expText.getPosition().y});
+	auto size = m_expText.getGlobalBounds();
+
+	m_expText.setPosition({ WINDOW_WIDTH + 75.f - size.width / 2.f, m_expText.getPosition().y});
 }
 
 void CUserInterface::UpdateLevel(int level)
@@ -306,6 +309,10 @@ CScene::CScene()
 	}
 
 	m_cooltime = {};
+	m_effects[0] = new CAttackEffect("Resource/AttackEffect.png", 0.25f, 3);
+	m_effects[1] = new CSkillEffect1("Resource/SkillEffect1.png", 0.25f, 7);
+	m_effects[2] = new CSkillEffect2("Resource/SkillEffect2.png", 0.1f, 12);
+	m_effects[3] = new CSkillEffect3("Resource/SkillEffect3.png", 0.1f, 10);	
 }
 
 CScene::~CScene()
@@ -318,8 +325,14 @@ CScene::~CScene()
 		delete m_enemy[i];
 }
 
-void CScene::Update()
+void CScene::Update(float ElapsedTime)
 {
+	for (int i = 0; i < m_effects.size(); ++i) {
+		if (m_effects[i]) {
+			if(m_effects[i]->GetEnable())
+				m_effects[i]->Update(ElapsedTime);
+		}
+	}
 }
 
 void CScene::Render(sf::RenderWindow& RW)
@@ -382,6 +395,13 @@ void CScene::Render(sf::RenderWindow& RW)
 	RW.draw(text);
 
 	m_interface->Render(RW);
+
+	for (int i = 0; i < m_effects.size(); ++i) {
+		if (m_effects[i]) {
+			if (m_effects[i]->GetEnable())
+				m_effects[i]->Render(RW, m_avatar->m_x, m_avatar->m_y, m_left, m_top, m_avatar->GetDir());
+		}
+	}
 }
 
 void CScene::ProcessLoginInfoPacket(char* ptr)
@@ -529,4 +549,19 @@ void CScene::SetSkillOnOff(int skill, bool type)
 	default:
 		break;
 	}
+}
+
+void CScene::SetEffectEnable(int index, bool type)
+{
+	m_effects[index]->SetEnable(type);
+}
+
+void CScene::SetDir(DIR dir)
+{
+	m_avatar->SetDir(dir);
+}
+
+const bool CScene::GetEffectEnable(int index) const
+{
+	return m_effects[index]->GetEnable();
 }

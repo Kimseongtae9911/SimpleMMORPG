@@ -147,6 +147,8 @@ CPlayer::CPlayer()
 {
 	m_usedTime = { };
 	m_power = 20;
+	m_poweruptime = {};
+	m_powerup = false;
 }
 
 CPlayer::~CPlayer()
@@ -184,6 +186,35 @@ void CPlayer::Send_LoginInfo_Packet()
 	SendPacket(&p);
 }
 
+void CPlayer::Send_StatChange_Packet()
+{
+	SC_STAT_CHANGE_PACKET packet;
+
+	packet.size = sizeof(packet);
+	packet.type = SC_STAT_CHANGE;
+	packet.max_hp = m_maxHp;
+	packet.hp = m_curHp;
+	packet.max_mp = m_maxMp;
+	packet.mp = m_curMp;
+	packet.level = m_level;
+	packet.exp = m_exp;
+
+	SendPacket(&packet);
+}
+
+void CPlayer::Send_Damage_Packet(int cid, int powerlv)
+{
+	SC_DAMAGE_PACKET p;
+
+	p.size = sizeof(p);
+	p.type = SC_DAMAGE;
+	p.id = cid;
+	p.hp = clients[cid]->GetCurHp() - m_power * powerlv;
+	clients[cid]->SetCurHp(p.hp);
+
+	SendPacket(&p);
+}
+
 void CPlayer::Attack()
 {
 	m_ViewLock.lock();
@@ -211,31 +242,122 @@ void CPlayer::Attack()
 			cid = id;
 		}
 		if (-1 != cid) {
-			SC_DAMAGE_PACKET p;
-			p.size = sizeof(p);
-			p.type = SC_DAMAGE;
-			p.id = cid;
-			p.hp = clients[cid]->GetCurHp() - m_power;
-			clients[cid]->SetCurHp(p.hp);
-			SendPacket(&p);
+			if (true == m_powerup) {
+				if (chrono::duration_cast<chrono::seconds>(chrono::system_clock::now() - m_poweruptime).count() >= POWERUP_TIME) {
+					m_powerup = false;
+					m_power /= 2;
+				}
+			}
+
+			Send_Damage_Packet(cid, 1);
 
 			if (clients[cid]->GetCurHp() <= 0.f) {
 				dynamic_cast<CNpc*>(clients[cid])->m_active = false;
 				Send_RemoveObject_Packet(cid);
 				GainExp(clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2);
-				SC_STAT_CHANGE_PACKET packet;
-				packet.size = sizeof(packet);
-				packet.type = SC_STAT_CHANGE;
-				packet.max_hp = m_maxHp;
-				packet.hp = m_curHp;
-				packet.max_mp = m_maxMp;
-				packet.mp = m_curMp;
-				packet.level = m_level;
-				packet.exp = m_exp;
-				SendPacket(&packet);
+				Send_StatChange_Packet();
 			}
 		}
 	}	
+}
+
+void CPlayer::Skill1()
+{
+	m_poweruptime = chrono::system_clock::now();
+	m_powerup = true;
+}
+
+void CPlayer::Skill2()
+{
+	m_ViewLock.lock();
+	auto v_list = m_view_list;
+	m_ViewLock.unlock();
+
+	for (const auto id : v_list) {
+		if (id < MAX_USER)
+			continue;
+
+		int cid = -1;
+		for (int i = 1; i < 5; ++i) {
+			switch (m_dir) {
+			case DIR::DOWN:
+				if (clients[id]->GetPosX() == m_PosX && clients[id]->GetPosY() - i == m_PosY) {
+					cid = id;
+				}
+				break;
+			case DIR::UP:
+				if (clients[id]->GetPosX() == m_PosX && clients[id]->GetPosY() + i == m_PosY) {
+					cid = id;
+				}
+				break;
+			case DIR::LEFT:
+				if (clients[id]->GetPosX() + i == m_PosX && clients[id]->GetPosY() == m_PosY) {
+					cid = id;
+				}
+				break;
+			case DIR::RIGHT:
+				if (clients[id]->GetPosX() - i == m_PosX && clients[id]->GetPosY() == m_PosY) {
+					cid = id;
+				}
+				break;
+			}
+		}
+		if (-1 != cid) {
+			if (true == m_powerup) {
+				if (chrono::duration_cast<chrono::seconds>(chrono::system_clock::now() - m_poweruptime).count() >= POWERUP_TIME) {
+					m_powerup = false;
+					m_power /= 2;
+				}
+			}
+			Send_Damage_Packet(cid, 3);
+
+			if (clients[cid]->GetCurHp() <= 0) {
+				dynamic_cast<CNpc*>(clients[cid])->m_active = false;
+				Send_RemoveObject_Packet(cid);
+				GainExp(clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2);
+				Send_StatChange_Packet();
+			}
+		}
+	}
+}
+
+void CPlayer::Skill3()
+{
+	m_ViewLock.lock();
+	auto v_list = m_view_list;
+	m_ViewLock.unlock();
+
+	for (const auto id : v_list) {
+		if (id < MAX_USER)
+			continue;
+		int cid = -1;
+		for (int i = -2; i < 3; ++i) {
+			for (int j = -2; j < 3; ++j) {
+				if (clients[id]->GetPosX() + i == m_PosX && clients[id]->GetPosY() + j == m_PosY) {
+					cid = id;
+					break;
+				}
+			}
+			if (cid != -1)
+				break;
+		}
+		if (-1 != cid) {
+			if (true == m_powerup) {
+				if (chrono::duration_cast<chrono::seconds>(chrono::system_clock::now() - m_poweruptime).count() >= POWERUP_TIME) {
+					m_powerup = false;
+					m_power /= 2;
+				}
+			}
+			Send_Damage_Packet(cid, 2);
+
+			if (clients[cid]->GetCurHp() <= 0) {
+				dynamic_cast<CNpc*>(clients[cid])->m_active = false;
+				Send_RemoveObject_Packet(cid);
+				GainExp(clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2);
+				Send_StatChange_Packet();
+			}
+		}
+	}
 }
 
 void CPlayer::GainExp(int exp)

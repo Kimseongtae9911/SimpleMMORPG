@@ -1,9 +1,10 @@
 #pragma once
 
 #define ATTACK_COOL 1.f
-#define SKILL1_COOL 10.f
-#define SKILL2_COOL 7.f
-#define SKILL3_COOL 5.f
+#define SKILL1_COOL 20.f
+#define SKILL2_COOL 5.f
+#define SKILL3_COOL 7.f
+#define POWERUP_TIME 10.f
 
 class OVER_EXP {
 public:
@@ -117,21 +118,36 @@ public:
 	void SetMaxMp(const int mp) { m_maxMp = mp; }
 	void SetMp(const int mp) { m_curMp = mp; }
 	void SetUsedTime(const int index, const chrono::system_clock::time_point time) { m_usedTime[index] = time; }
+	void SetDir(DIR dir) { m_dir = dir; }
+	void SetPower(int power) { m_power = power; }
+	void SetPowerUp(bool power) { m_powerup = power; }
 
 	const int GetExp() const { return m_exp; }
+	const int GetMp() const { return m_curMp; }
+	const int GetPower() const { return m_power; }
+	const bool GetPowerUp() const { return m_powerup; }
 	const chrono::system_clock::time_point GetUsedTime(const int index) const { return m_usedTime[index]; }
 
 	void PlayerAccept(int id, SOCKET sock);
 	void Send_LoginInfo_Packet();
+	void Send_StatChange_Packet();
+	void Send_Damage_Packet(int cid, int powerlv);
 
 	void Attack();
+	void Skill1();
+	void Skill2();
+	void Skill3();
 	void GainExp(int exp);
 
 private:
+	chrono::system_clock::time_point m_poweruptime;
+	bool m_powerup;
+
 	int m_maxExp;
 	int m_exp;
 	int m_maxMp;
 	int m_curMp;
 	int m_power;
+	DIR m_dir;
 	array<chrono::system_clock::time_point, 4> m_usedTime;
 };

@@ -27,6 +27,8 @@ constexpr int VIEW_RANGE = 7;
 constexpr int INIT_EXP = 10;
 constexpr int EXP_UP = 40;
 
+enum class DIR {LEFT, RIGHT, UP, DOWN};
+
 enum class OP_TYPE { OP_ACCEPT, OP_RECV, OP_SEND, OP_NPC_MOVE, OP_AI_HELLO };
 
 enum class CL_STATE {ST_FREE, ST_ALLOC, ST_INGAME};

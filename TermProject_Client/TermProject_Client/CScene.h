@@ -1,13 +1,15 @@
 #pragma once
 
 #define ATTACK_COOL 1.f
-#define SKILL1_COOL 10.f
-#define SKILL2_COOL 7.f
-#define SKILL3_COOL 5.f
+#define SKILL1_COOL 20.f
+#define SKILL2_COOL 5.f
+#define SKILL3_COOL 7.f
+#define POWERUP_TIME 10.f
 
 class CObject;
 class CPlayer;
 class CMoveObject;
+class CEffect;
 
 class CUserInterface
 {
@@ -58,7 +60,7 @@ public:
 	CScene();
 	~CScene();
 
-	void Update();
+	void Update(float ElapsedTime);
 	void Render(sf::RenderWindow& RW);
 	
 	void ProcessLoginInfoPacket(char* ptr);
@@ -71,9 +73,11 @@ public:
 
 	void ChangeAvartarTex(int x, int y, int x2, int y2);
 	void SetSkillOnOff(int skill, bool type);
+	void SetEffectEnable(int index, bool type);
+	void SetDir(DIR dir);
 
 	const chrono::system_clock::time_point GetCoolTime(int index) const { return m_cooltime[index]; }
-
+	const bool GetEffectEnable(int index) const;
 	void SetCoolTime(int index, chrono::system_clock::time_point time) { m_cooltime[index] = time; }
 	
 
@@ -85,6 +89,7 @@ private:
 
 	CPlayer* m_avatar;
 	CMoveObject** m_objects;
+	array<CEffect*, 4> m_effects;
 
 	unique_ptr<CUserInterface> m_interface;	
 

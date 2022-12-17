@@ -58,9 +58,13 @@ public:
 	virtual ~CPlayer() {}
 
 	void SetExp(int exp) { m_exp = exp; }
+	void SetDir(DIR dir) { m_dir = dir; }
+
+	const DIR GetDir() const { return m_dir; }
 
 private:
 	int m_exp;
+	DIR m_dir;
 };
 
 class CNpc : public CMoveObject

@@ -17,6 +17,7 @@ private:
 
 private:
 	sf::RenderWindow m_window = {};
+	sf::Clock m_sfClock = {};
 
 	unique_ptr<CPacketMgr> m_packetMgr;
 	shared_ptr<CScene> m_scene;

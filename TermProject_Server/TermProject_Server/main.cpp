@@ -87,10 +87,22 @@ void process_packet(int c_id, char* packet)
 		short y = clients[c_id]->GetPosY();
 		if (Can_Move(x, y, p->direction)) {
 			switch (p->direction) {
-			case 0: y--; break;
-			case 1: y++; break;
-			case 2: x--; break;
-			case 3: x++; break;
+			case 0: {
+				dynamic_cast<CPlayer*>(clients[c_id])->SetDir(DIR::UP);
+				y--; break;
+			}
+			case 1: {
+				dynamic_cast<CPlayer*>(clients[c_id])->SetDir(DIR::DOWN);
+				y++; break;
+			}
+			case 2: {
+				dynamic_cast<CPlayer*>(clients[c_id])->SetDir(DIR::LEFT);
+				x--; break;
+			}
+			case 3: {
+				dynamic_cast<CPlayer*>(clients[c_id])->SetDir(DIR::RIGHT);
+				x++; break;
+			}
 			}
 			clients[c_id]->SetPos(x, y);
 
@@ -146,10 +158,22 @@ void process_packet(int c_id, char* packet)
 				dynamic_cast<CPlayer*>(clients[c_id])->Attack();
 				break;
 			case 1:
+				if (false == dynamic_cast<CPlayer*>(clients[c_id])->GetPowerUp()) {
+					dynamic_cast<CPlayer*>(clients[c_id])->Skill1();
+					dynamic_cast<CPlayer*>(clients[c_id])->SetMp(dynamic_cast<CPlayer*>(clients[c_id])->GetMp() - 15);
+					dynamic_cast<CPlayer*>(clients[c_id])->SetPower(dynamic_cast<CPlayer*>(clients[c_id])->GetPower() * 2);
+					dynamic_cast<CPlayer*>(clients[c_id])->Send_StatChange_Packet();
+				}
 				break;
 			case 2:
+				dynamic_cast<CPlayer*>(clients[c_id])->Skill2();
+				dynamic_cast<CPlayer*>(clients[c_id])->SetMp(dynamic_cast<CPlayer*>(clients[c_id])->GetMp() - 5);
+				dynamic_cast<CPlayer*>(clients[c_id])->Send_StatChange_Packet();
 				break;
 			case 3:
+				dynamic_cast<CPlayer*>(clients[c_id])->Skill3();
+				dynamic_cast<CPlayer*>(clients[c_id])->SetMp(dynamic_cast<CPlayer*>(clients[c_id])->GetMp() - 10);
+				dynamic_cast<CPlayer*>(clients[c_id])->Send_StatChange_Packet();
 				break;
 			}
 		}
@@ -242,6 +266,45 @@ void do_npc_random_move(int npc_id)
 	}
 }
 
+void worker_thread(HANDLE h_iocp);
+
+void timer_func();
+
+int main()
+{
+	WSADATA WSAData;
+	WSAStartup(MAKEWORD(2, 2), &WSAData);
+	g_s_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+	SOCKADDR_IN server_addr;
+	memset(&server_addr, 0, sizeof(server_addr));
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_port = htons(PORT_NUM);
+	server_addr.sin_addr.S_un.S_addr = INADDR_ANY;
+	bind(g_s_socket, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr));
+	listen(g_s_socket, SOMAXCONN);
+	SOCKADDR_IN cl_addr;
+	int addr_size = sizeof(cl_addr);
+	
+	InitializeData();
+
+	h_iocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0);
+	CreateIoCompletionPort(reinterpret_cast<HANDLE>(g_s_socket), h_iocp, 9999, 0);
+	g_c_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);	
+	g_a_over.m_comp_type = OP_TYPE::OP_ACCEPT;
+	AcceptEx(g_s_socket, g_c_socket, g_a_over.m_send_buf, 0, addr_size + 16, addr_size + 16, 0, &g_a_over.m_over);
+
+	vector <thread> worker_threads;
+	int num_threads = std::thread::hardware_concurrency();
+	for (int i = 0; i < num_threads - 1; ++i)
+		worker_threads.emplace_back(worker_thread, h_iocp);
+	thread timer_thread{ timer_func };
+	timer_thread.join();
+	for (auto& th : worker_threads)
+		th.join();
+	closesocket(g_s_socket);
+	WSACleanup();
+}
+
 void worker_thread(HANDLE h_iocp)
 {
 	while (true) {
@@ -325,7 +388,7 @@ void worker_thread(HANDLE h_iocp)
 			}
 			delete ex_over;
 		}
-						break;
+								 break;
 		case OP_TYPE::OP_AI_HELLO:
 			dynamic_cast<CNpc*>(clients[key])->LuaLock.lock();
 			lua_getglobal(dynamic_cast<CNpc*>(clients[key])->GetLua(), "event_player_move");
@@ -337,43 +400,6 @@ void worker_thread(HANDLE h_iocp)
 			break;
 		}
 	}
-}
-
-void timer_func();
-
-int main()
-{
-	WSADATA WSAData;
-	WSAStartup(MAKEWORD(2, 2), &WSAData);
-	g_s_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
-	SOCKADDR_IN server_addr;
-	memset(&server_addr, 0, sizeof(server_addr));
-	server_addr.sin_family = AF_INET;
-	server_addr.sin_port = htons(PORT_NUM);
-	server_addr.sin_addr.S_un.S_addr = INADDR_ANY;
-	bind(g_s_socket, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr));
-	listen(g_s_socket, SOMAXCONN);
-	SOCKADDR_IN cl_addr;
-	int addr_size = sizeof(cl_addr);
-	
-	InitializeData();
-
-	h_iocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0);
-	CreateIoCompletionPort(reinterpret_cast<HANDLE>(g_s_socket), h_iocp, 9999, 0);
-	g_c_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);	
-	g_a_over.m_comp_type = OP_TYPE::OP_ACCEPT;
-	AcceptEx(g_s_socket, g_c_socket, g_a_over.m_send_buf, 0, addr_size + 16, addr_size + 16, 0, &g_a_over.m_over);
-
-	vector <thread> worker_threads;
-	int num_threads = std::thread::hardware_concurrency();
-	for (int i = 0; i < num_threads - 1; ++i)
-		worker_threads.emplace_back(worker_thread, h_iocp);
-	thread timer_thread{ timer_func };
-	timer_thread.join();
-	for (auto& th : worker_threads)
-		th.join();
-	closesocket(g_s_socket);
-	WSACleanup();
 }
 
 void timer_func()
@@ -522,19 +548,22 @@ bool Can_Use(int id, char skill, chrono::system_clock::time_point time)
 		}
 		break;
 	case 1:
-		if (chrono::duration_cast<chrono::seconds>(time - dynamic_cast<CPlayer*>(clients[id])->GetUsedTime(1)).count() >= SKILL1_COOL) {
+		if (chrono::duration_cast<chrono::seconds>(time - dynamic_cast<CPlayer*>(clients[id])->GetUsedTime(1)).count() >= SKILL1_COOL &&
+			dynamic_cast<CPlayer*>(clients[id])->GetMp() >= 15) {
 			dynamic_cast<CPlayer*>(clients[id])->SetUsedTime(1, time);
 			return true;
 		}
 		break;
 	case 2:
-		if (chrono::duration_cast<chrono::seconds>(time - dynamic_cast<CPlayer*>(clients[id])->GetUsedTime(2)).count() >= SKILL2_COOL) {
+		if (chrono::duration_cast<chrono::seconds>(time - dynamic_cast<CPlayer*>(clients[id])->GetUsedTime(2)).count() >= SKILL2_COOL &&
+			dynamic_cast<CPlayer*>(clients[id])->GetMp() >= 5) {
 			dynamic_cast<CPlayer*>(clients[id])->SetUsedTime(2, time);
 			return true;
 		}
 		break;
 	case 3:
-		if (chrono::duration_cast<chrono::seconds>(time - dynamic_cast<CPlayer*>(clients[id])->GetUsedTime(3)).count() >= SKILL3_COOL) {
+		if (chrono::duration_cast<chrono::seconds>(time - dynamic_cast<CPlayer*>(clients[id])->GetUsedTime(3)).count() >= SKILL3_COOL &&
+			dynamic_cast<CPlayer*>(clients[id])->GetMp() >= 10) {
 			dynamic_cast<CPlayer*>(clients[id])->SetUsedTime(3, time);
 			return true;
 		}
