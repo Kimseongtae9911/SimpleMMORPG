@@ -1,4 +1,5 @@
 #pragma once
+#include <chrono>
 
 constexpr int PORT_NUM = 4000;
 constexpr int BUF_SIZE = 200;
@@ -27,6 +28,7 @@ constexpr char SC_CHAT = 6;
 constexpr char SC_LOGIN_OK = 7;
 constexpr char SC_LOGIN_FAIL = 8;
 constexpr char SC_STAT_CHANGE = 9;
+constexpr char SC_DAMAGE = 10;
 
 #pragma pack (push, 1)
 struct CS_LOGIN_PACKET {
@@ -62,6 +64,7 @@ struct CS_ATTACK_PACKET {
 	unsigned char size;
 	char type;
 	char skill;	// 0: normal attack
+	std::chrono::system_clock::time_point time;
 };
 
 struct SC_LOGIN_INFO_PACKET {
@@ -81,6 +84,9 @@ struct SC_ADD_OBJECT_PACKET {
 	char	type;
 	int		id;
 	short	x, y;
+	int level;
+	int max_hp;
+	int hp;
 	char	name[NAME_SIZE];
 };
 
@@ -116,9 +122,9 @@ struct SC_LOGIN_FAIL_PACKET {
 
 };
 
-struct SC_STAT_CHANGEL_PACKET {
+struct SC_STAT_CHANGE_PACKET {
 	unsigned char size;
-	char	type;
+	char	type;	
 	int		hp;
 	int		max_hp;
 	int		exp;
@@ -126,4 +132,10 @@ struct SC_STAT_CHANGEL_PACKET {
 
 };
 
+struct SC_DAMAGE_PACKET {
+	unsigned char size;
+	char	type;
+	int id;
+	int hp;
+};
 #pragma pack (pop)

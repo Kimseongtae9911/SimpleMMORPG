@@ -23,7 +23,7 @@ extern "C" {
 
 using namespace std;
 
-constexpr int VIEW_RANGE = 15;
+constexpr int VIEW_RANGE = 7;
 
 enum class OP_TYPE { OP_ACCEPT, OP_RECV, OP_SEND, OP_NPC_MOVE, OP_AI_HELLO };
 

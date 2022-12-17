@@ -17,6 +17,7 @@ int Get_NewID();
 
 bool Can_See(int from, int to);
 bool Can_Move(short x, short y, char dir);
+bool Can_Use(int id, char skill, chrono::system_clock::time_point time);
 
 void WakeUpNPC(int npc_id, int waker)
 {
@@ -59,7 +60,7 @@ void process_packet(int c_id, char* packet)
 			for (auto& pl : clients) {
 				{
 					lock_guard<mutex> ll(pl->m_StateLock);
-					if (CL_STATE::ST_INGAME != pl->GetState()) 
+					if (CL_STATE::ST_INGAME != pl->GetState())
 						continue;
 				}
 				if (pl->GetID() == c_id)
@@ -73,7 +74,7 @@ void process_packet(int c_id, char* packet)
 				clients[c_id]->Send_AddObject_Packet(pl->GetID());
 			}
 		}
-		
+
 		break;
 	}
 	case CS_MOVE: {
@@ -83,10 +84,10 @@ void process_packet(int c_id, char* packet)
 		short y = clients[c_id]->GetPosY();
 		if (Can_Move(x, y, p->direction)) {
 			switch (p->direction) {
-			case 0: if (y > 0) y--; break;
-			case 1: if (y < W_HEIGHT - 1) y++; break;
-			case 2: if (x > 0) x--; break;
-			case 3: if (x < W_WIDTH - 1) x++; break;
+			case 0: y--; break;
+			case 1: y++; break;
+			case 2: x--; break;
+			case 3: x++; break;
 			}
 			clients[c_id]->SetPos(x, y);
 
@@ -134,7 +135,23 @@ void process_packet(int c_id, char* packet)
 			break;
 		}
 	}
-
+	case CS_ATTACK: {
+		CS_ATTACK_PACKET* p = reinterpret_cast<CS_ATTACK_PACKET*>(packet);
+		if (Can_Use(c_id, p->skill, p->time)) {
+			switch (p->skill) {
+			case 0:
+				dynamic_cast<CPlayer*>(clients[c_id])->Attack();
+				break;
+			case 1:
+				break;
+			case 2:
+				break;
+			case 3:
+				break;
+			}
+		}
+		break;
+	}
 	}
 }
 
@@ -164,57 +181,62 @@ void disconnect(int c_id)
 
 void do_npc_random_move(int npc_id)
 {
-	//SESSION& npc = clients[npc_id];
-	//unordered_set<int> old_vl;
-	//for (auto& obj : clients) {
-	//	if (ST_INGAME != obj._state) continue;
-	//	if (true == is_npc(obj._id)) continue;
-	//	if (true == Can_See(npc._id, obj._id))
-	//		old_vl.insert(obj._id);
-	//}
+	CObject* npc = clients[npc_id];
+	unordered_set<int> old_vl;
+	for (auto& obj : clients) {
+		if (CL_STATE::ST_INGAME != obj->GetState()) 
+			continue;
+		if (obj->GetID() >= MAX_USER)
+			continue;
+		if (true == Can_See(npc->GetID(), obj->GetID()))
+			old_vl.insert(obj->GetID());
+	}
 
-	//int x = npc.x;
-	//int y = npc.y;
-	//switch (rand() % 4) {
-	//case 0: if (x < (W_WIDTH - 1)) x++; break;
-	//case 1: if (x > 0) x--; break;
-	//case 2: if (y < (W_HEIGHT - 1)) y++; break;
-	//case 3:if (y > 0) y--; break;
-	//}
-	//npc.x = x;
-	//npc.y = y;
+	int x = npc->GetPosX();
+	int y = npc->GetPosY();
+	int dir = rand() % 4;
+	if (Can_Move(x, y, dir)) {
+		switch (dir) {
+		case 0:	y--; break;
+		case 1:	y++; break;
+		case 2:	x--; break;
+		case 3:	x++; break;
+		}
+		npc->SetPos(x, y);
+	}
+	unordered_set<int> new_vl;
+	for (auto& obj : clients) {
+		if (CL_STATE::ST_INGAME != obj->GetState()) 
+			continue;
+		if (obj->GetID() >= MAX_USER) 
+			continue;
+		if (true == Can_See(npc->GetID(), npc->GetID()))
+			new_vl.insert(obj->GetID());
+	}
 
-	//unordered_set<int> new_vl;
-	//for (auto& obj : clients) {
-	//	if (ST_INGAME != obj._state) continue;
-	//	if (true == is_npc(obj._id)) continue;
-	//	if (true == Can_See(npc._id, obj._id))
-	//		new_vl.insert(obj._id);
-	//}
-
-	//for (auto pl : new_vl) {
-	//	if (0 == old_vl.count(pl)) {
-	//		// 플레이어의 시야에 등장
-	//		clients[pl].send_add_player_packet(npc._id);
-	//	}
-	//	else {
-	//		// 플레이어가 계속 보고 있음.
-	//		clients[pl].send_move_packet(npc._id);
-	//	}
-	//}
-	/////vvcxxccxvvdsvdvds
-	//for (auto pl : old_vl) {
-	//	if (0 == new_vl.count(pl)) {
-	//		clients[pl]._vl.lock();
-	//		if (0 != clients[pl]._view_list.count(npc._id)) {
-	//			clients[pl]._vl.unlock();
-	//			clients[pl].send_remove_player_packet(npc._id);
-	//		}
-	//		else {
-	//			clients[pl]._vl.unlock();
-	//		}
-	//	}
-	//}
+	for (auto pl : new_vl) {
+		if (0 == old_vl.count(pl)) {
+			// 플레이어의 시야에 등장
+			clients[pl]->Send_AddObject_Packet(npc->GetID());
+		}
+		else {
+			// 플레이어가 계속 보고 있음.
+			clients[pl]->Send_Move_Packet(npc->GetID());
+		}
+	}
+	
+	for (auto pl : old_vl) {
+		if (0 == new_vl.count(pl)) {
+			clients[pl]->m_ViewLock.lock();
+			if (0 != clients[pl]->GetViewList().count(npc->GetID())) {
+				clients[pl]->m_ViewLock.unlock();
+				clients[pl]->Send_RemoveObject_Packet(npc->GetID());
+			}
+			else {
+				clients[pl]->m_ViewLock.unlock();
+			}
+		}
+	}
 }
 
 void worker_thread(HANDLE h_iocp)
@@ -343,8 +365,8 @@ int main()
 	int num_threads = std::thread::hardware_concurrency();
 	for (int i = 0; i < num_threads - 1; ++i)
 		worker_threads.emplace_back(worker_thread, h_iocp);
-	//thread timer_thread{ timer_func };
-	//timer_thread.join();
+	thread timer_thread{ timer_func };
+	timer_thread.join();
 	for (auto& th : worker_threads)
 		th.join();
 	closesocket(g_s_socket);
@@ -386,8 +408,8 @@ void InitializeData()
 	}
 	cout << "Initialize NPC Start" << endl;
 	for (int i = MAX_USER; i < MAX_USER + MAX_NPC; ++i) {
-		clients[i] = new CPlayer();
-		//clients[i] = new CNpc(i);
+		//clients[i] = new CPlayer();
+		clients[i] = new CNpc(i);
 	}
 	cout << "Initialize NPC Complete" << endl;
 
@@ -483,4 +505,35 @@ bool Can_See(int from, int to)
 		return false;
 
 	return abs(clients[from]->GetPosY() - clients[to]->GetPosY()) <= VIEW_RANGE;
+}
+
+bool Can_Use(int id, char skill, chrono::system_clock::time_point time)
+{
+	switch (skill) {
+	case 0:
+		if (chrono::duration_cast<chrono::seconds>(time - dynamic_cast<CPlayer*>(clients[id])->GetUsedTime(0)).count() >= ATTACK_COOL) {
+			dynamic_cast<CPlayer*>(clients[id])->SetUsedTime(0, time);
+			return true;
+		}
+		break;
+	case 1:
+		if (chrono::duration_cast<chrono::seconds>(time - dynamic_cast<CPlayer*>(clients[id])->GetUsedTime(1)).count() >= SKILL1_COOL) {
+			dynamic_cast<CPlayer*>(clients[id])->SetUsedTime(1, time);
+			return true;
+		}
+		break;
+	case 2:
+		if (chrono::duration_cast<chrono::seconds>(time - dynamic_cast<CPlayer*>(clients[id])->GetUsedTime(2)).count() >= SKILL2_COOL) {
+			dynamic_cast<CPlayer*>(clients[id])->SetUsedTime(2, time);
+			return true;
+		}
+		break;
+	case 3:
+		if (chrono::duration_cast<chrono::seconds>(time - dynamic_cast<CPlayer*>(clients[id])->GetUsedTime(3)).count() >= SKILL3_COOL) {
+			dynamic_cast<CPlayer*>(clients[id])->SetUsedTime(3, time);
+			return true;
+		}
+		break;
+	}
+	return false;
 }

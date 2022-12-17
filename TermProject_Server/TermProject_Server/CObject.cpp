@@ -3,6 +3,7 @@
 #include "LuaFunc.h"
 
 extern HANDLE h_iocp;
+extern array<CObject*, MAX_USER + MAX_NPC> clients;
 CObject::CObject()
 {
 	m_ID = -1;
@@ -46,8 +47,8 @@ void CObject::Send_Move_Packet(int c_id)
 	p.id = c_id;
 	p.size = sizeof(SC_MOVE_OBJECT_PACKET);
 	p.type = SC_MOVE_OBJECT;
-	p.x = m_PosX;
-	p.y = m_PosY;
+	p.x = clients[c_id]->GetPosX();
+	p.y = clients[c_id]->GetPosY();
 	p.move_time = last_move_time;
 	SendPacket(&p);
 }
@@ -56,11 +57,23 @@ void CObject::Send_AddObject_Packet(int c_id)
 {
 	SC_ADD_OBJECT_PACKET add_packet;
 	add_packet.id = c_id;
-	strcpy_s(add_packet.name, m_Name);
+	strcpy_s(add_packet.name, clients[c_id]->GetName());
 	add_packet.size = sizeof(add_packet);
 	add_packet.type = SC_ADD_OBJECT;
-	add_packet.x = m_PosX;
-	add_packet.y = m_PosY;
+	add_packet.x = clients[c_id]->GetPosX();
+	add_packet.y = clients[c_id]->GetPosY();
+
+	if (c_id >= MAX_USER) {
+		add_packet.level = clients[c_id]->GetLevel();
+		add_packet.hp = clients[c_id]->GetCurHp();
+		add_packet.max_hp = clients[c_id]->GetMaxHp();
+	}
+	else {
+		add_packet.level = 0;
+		add_packet.hp = 0;
+		add_packet.max_hp = 0;
+	}
+
 	m_ViewLock.lock();
 	m_view_list.insert(c_id);
 	m_ViewLock.unlock();
@@ -96,6 +109,9 @@ void CObject::Send_RemoveObject_Packet(int c_id)
 
 CNpc::CNpc(int id)
 {
+	m_level = 1;
+	m_curHp = 100;
+	m_maxHp = 100;
 	m_PosX = rand() % W_WIDTH;
 	m_PosY = rand() % W_HEIGHT;
 	m_ID = id;
@@ -126,6 +142,8 @@ CNpc::~CNpc()
 
 CPlayer::CPlayer()
 {
+	m_usedTime = { };
+	m_power = 20;
 }
 
 CPlayer::~CPlayer()
@@ -159,4 +177,42 @@ void CPlayer::Send_LoginInfo_Packet()
 	p.level = m_level;
 	strcpy_s(p.name, m_Name);
 	SendPacket(&p);
+}
+
+void CPlayer::Attack()
+{
+	m_ViewLock.lock();
+	auto v_list = m_view_list;
+	m_ViewLock.unlock();
+
+	for (const auto id : v_list) {
+		if (id < MAX_USER)
+			continue;
+		int cid = -1;
+		if (clients[id]->GetPosX() == m_PosX && clients[id]->GetPosY() + 1 == m_PosY) {
+			//아래있는 몬스터
+			cid = id;
+		}
+		else if (clients[id]->GetPosX() == m_PosX && clients[id]->GetPosY() - 1 == m_PosY) {
+			//위에 있는 몬스터
+			cid = id;
+		}
+		else if (clients[id]->GetPosY() == m_PosY && clients[id]->GetPosX() + 1 == m_PosX) {
+			//오른족에 있는 몬스터
+			cid = id;
+		}
+		else if (clients[id]->GetPosY() == m_PosY && clients[id]->GetPosX() - 1 == m_PosX) {
+			//왼쪽에 있는 몬스터
+			cid = id;
+		}
+		if (-1 != cid) {
+			SC_DAMAGE_PACKET p;
+			p.size = sizeof(p);
+			p.type = SC_DAMAGE;
+			p.id = cid;
+			p.hp = clients[cid]->GetCurHp() - m_power;
+			clients[cid]->SetCurHp(p.hp);
+			SendPacket(&p);
+		}
+	}
 }

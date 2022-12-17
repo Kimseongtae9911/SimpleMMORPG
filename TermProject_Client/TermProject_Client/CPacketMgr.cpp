@@ -74,33 +74,25 @@ void CPacketMgr::ProcessPacket(char* ptr)
 	switch (ptr[1])
 	{
 	case SC_LOGIN_INFO:
-	{
 		m_scene->ProcessLoginInfoPacket(ptr);
 		break;
-	}
 	case SC_LOGIN_FAIL:
 		break;
 	case SC_ADD_OBJECT:
-	{
 		m_scene->ProcessAddObjectPacket(ptr);
 		break;
-	}
 	case SC_MOVE_OBJECT:
-	{
 		m_scene->ProcessMoveObjectPacket(ptr);
 		break;
-	}
-
 	case SC_REMOVE_OBJECT:
-	{
 		m_scene->ProcessRemoveObjectPacket(ptr);
 		break;
-	}
 	case SC_CHAT:
-	{
 		m_scene->ProcessChatPacket(ptr);
 		break;
-	}
+	case SC_DAMAGE:
+		m_scene->ProcessDamagePacket(ptr);
+		break;
 	default:
 		printf("Unknown PACKET type [%d]\n", ptr[1]);
 	}

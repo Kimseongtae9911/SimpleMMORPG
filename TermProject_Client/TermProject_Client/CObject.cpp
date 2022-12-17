@@ -64,4 +64,44 @@ CPlayer::CPlayer(sf::Texture& t, int x, int y, int x2, int y2)
 
 CNpc::CNpc(sf::Texture& t, int x, int y, int x2, int y2)
 {
+	m_showing = false;
+	m_sprite.setTexture(t);
+	m_sprite.setTextureRect(sf::IntRect(x, y, x2, y2));
+	m_mess_end_time = chrono::system_clock::now();
+
+	m_barBG.setSize({ 32.f, 3.f });
+	m_barBG.setFillColor(sf::Color(50, 50, 50, 200));
+
+	m_hpBar.setSize({ 32.f, 3.f });
+	m_hpBar.setFillColor(sf::Color(250, 50, 50, 200));
+	m_name.setCharacterSize(8);
+}
+
+void CNpc::draw(sf::RenderWindow& RW, int left, int top)
+{
+	if (false == m_showing)
+		return;
+	float rx = (m_x - left) * 32.f + 8;
+	float ry = (m_y - top) * 32.f + 8;
+	m_sprite.setPosition(rx, ry);
+	RW.draw(m_sprite);
+
+	//render hp
+	m_barBG.setPosition(rx, ry - m_barBG.getSize().y + 1);
+	m_hpBar.setPosition(rx, ry - m_hpBar.getSize().y + 1);
+	RW.draw(m_barBG);
+	RW.draw(m_hpBar);
+	
+
+	//render level
+	m_name.setString("LV" + to_string(m_level));
+	auto size = m_name.getGlobalBounds();
+	m_name.setPosition(rx + 16.f - size.width / 2, ry - 20);
+	RW.draw(m_name);
+}
+
+void CNpc::UpdateHPBar()
+{
+	float percent = static_cast<float>(m_curHP) / static_cast<float>(m_maxHP);
+	m_hpBar.setSize({m_hpBar.getSize().x * percent, m_hpBar.getSize().y});
 }

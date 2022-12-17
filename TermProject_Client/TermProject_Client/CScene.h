@@ -1,4 +1,10 @@
 #pragma once
+
+#define ATTACK_COOL 1.f
+#define SKILL1_COOL 10.f
+#define SKILL2_COOL 7.f
+#define SKILL3_COOL 5.f
+
 class CObject;
 class CPlayer;
 class CMoveObject;
@@ -15,6 +21,8 @@ public:
 	void UpdateMp(int maxmp, int curmp);
 	void UpdateExp(int maxexp, int curexp);
 	void UpdateLevel(int level);
+
+	void SetSkillOnOff(int skill, bool type);
 
 private:
 	sf::Texture m_skillTex;
@@ -58,22 +66,30 @@ public:
 	void ProcessMoveObjectPacket(char* ptr);
 	void ProcessRemoveObjectPacket(char* ptr);
 	void ProcessChatPacket(char* ptr);
+	void ProcessDamagePacket(char* ptr);
 
 	void ChangeAvartarTex(int x, int y, int x2, int y2);
+	void SetSkillOnOff(int skill, bool type);
+
+	const chrono::system_clock::time_point GetCoolTime(int index) const { return m_cooltime[index]; }
+
+	void SetCoolTime(int index, chrono::system_clock::time_point time) { m_cooltime[index] = time; }
+	
 
 private:
 	int m_left;
 	int m_top;
 	int m_id;
+	array<chrono::system_clock::time_point, 4> m_cooltime;
 
 	CPlayer* m_avatar;
-	CMoveObject** m_players;
+	CMoveObject** m_objects;
 
 	unique_ptr<CUserInterface> m_interface;	
 
 	sf::Texture* m_mapTile;
 	sf::Texture* m_character;
-	sf::Texture* m_enemy;
+	array<sf::Texture*, 3> m_enemy;
 	sf::Texture* m_items;
 	sf::Texture* m_skills;
 

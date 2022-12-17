@@ -27,6 +27,10 @@ void CFramework::Process()
 {
 	while (m_window.isOpen())
 	{
+		auto time = chrono::system_clock::now();
+		if (chrono::duration_cast<chrono::seconds>(time - m_scene->GetCoolTime(0)).count() >= 1.f) {
+			m_scene->SetSkillOnOff(0, false);
+		}
 		sf::Event event;
 		while (m_window.pollEvent(event))
 		{
@@ -34,6 +38,7 @@ void CFramework::Process()
 				m_window.close();
 			if (event.type == sf::Event::KeyPressed) {
 				int direction = -1;
+				char skill = -1;
 				switch (event.key.code) {
 				case sf::Keyboard::Left:
 					direction = 2;
@@ -54,6 +59,13 @@ void CFramework::Process()
 				case sf::Keyboard::Escape:
 					m_window.close();
 					break;
+				case sf::Keyboard::A:
+					if (chrono::duration_cast<chrono::seconds>(time - m_scene->GetCoolTime(0)).count() >= 1.f) {
+						skill = 0;
+						m_scene->SetCoolTime(0, time);
+						m_scene->SetSkillOnOff(0, true);
+					}
+					break;
 				}
 				if (-1 != direction) {
 					CS_MOVE_PACKET p;
@@ -62,7 +74,14 @@ void CFramework::Process()
 					p.direction = direction;
 					m_packetMgr->SendPacket(&p);
 				}
-
+				if (-1 != skill) {
+					CS_ATTACK_PACKET p;
+					p.size = sizeof(p);
+					p.type = CS_ATTACK;
+					p.skill = skill;
+					p.time = chrono::system_clock::now();
+					m_packetMgr->SendPacket(&p);
+				}
 			}
 		}
 		m_window.clear();

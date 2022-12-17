@@ -1,4 +1,10 @@
 #pragma once
+
+#define ATTACK_COOL 1.f
+#define SKILL1_COOL 10.f
+#define SKILL2_COOL 7.f
+#define SKILL3_COOL 5.f
+
 class OVER_EXP {
 public:
 	WSAOVERLAPPED m_over;
@@ -54,6 +60,8 @@ public:
 	const int GetMaxHp() const { return m_maxHp; }
 	const int GetCurHp() const { return m_curHp; }
 	const int GetID() const { return m_ID; }
+	const char* GetName() const { return m_Name; }
+
 	const unordered_set<int>& GetViewList() const {return m_view_list; }
 	const SOCKET& GetSocket() const { return m_Socket; }
 
@@ -104,13 +112,19 @@ public:
 	CPlayer();
 	virtual ~CPlayer();
 
-	void SetExp(int exp) { m_exp = exp; }
+	void SetExp(const int exp) { m_exp = exp; }
+	void SetUsedTime(const int index, const chrono::system_clock::time_point time) { m_usedTime[index] = time; }
 
 	const int GetExp() const { return m_exp; }
+	const chrono::system_clock::time_point GetUsedTime(const int index) const { return m_usedTime[index]; }
 
 	void PlayerAccept(int id, SOCKET sock);
 	void Send_LoginInfo_Packet();
 
+	void Attack();
+
 private:
 	int m_exp;
+	int m_power;
+	array<chrono::system_clock::time_point, 4> m_usedTime;
 };

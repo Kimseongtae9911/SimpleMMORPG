@@ -1,4 +1,5 @@
 #pragma once
+
 class CObject
 {
 protected:
@@ -36,7 +37,7 @@ public:
 	virtual ~CMoveObject() {}
 
 	void move(int x, int y) { m_x = x; m_y = y; }
-	void draw(sf::RenderWindow& RW, int left, int top);
+	virtual void draw(sf::RenderWindow& RW, int left, int top);
 
 	void set_name(const char str[]);
 	void set_chat(const char str[]);
@@ -67,5 +68,13 @@ class CNpc : public CMoveObject
 public:
 	CNpc(sf::Texture& t, int x, int y, int x2, int y2);
 	virtual ~CNpc() {}
+
+	virtual void draw(sf::RenderWindow& RW, int left, int top);
+
+	void UpdateHPBar();
+
+private:
+	sf::RectangleShape m_barBG;
+	sf::RectangleShape m_hpBar;
 };
 

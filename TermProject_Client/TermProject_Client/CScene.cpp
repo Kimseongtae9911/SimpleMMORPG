@@ -67,7 +67,7 @@ CUserInterface::CUserInterface()
 	m_skill.setPosition(WINDOW_WIDTH + 25.f, 190.f);
 
 	for (int i = 0; i < m_usedskill.size(); ++i) {
-		m_usedskill[i].setFillColor(sf::Color(0, 0, 0, 180));
+		m_usedskill[i].setFillColor(sf::Color(0, 0, 0, 0)); //used --> alpha 180
 		m_usedskill[i].setSize({ 32, 32 });
 		m_usedskill[i].setPosition(WINDOW_WIDTH + 25.f + i * TILE_WIDTH, 190.f);
 	}
@@ -99,7 +99,7 @@ CUserInterface::CUserInterface()
 	m_attack.setTextureRect(sf::Rect(0, 0, TILE_WIDTH, TILE_WIDTH));
 	m_attack.setPosition(WINDOW_WIDTH + 59.f, 380.f);
 
-	m_attackcool.setFillColor(sf::Color(0, 0, 0, 180));
+	m_attackcool.setFillColor(sf::Color(0, 0, 0, 0)); //used --> alpha 180
 	m_attackcool.setSize({ 32, 32 });
 	m_attackcool.setPosition(WINDOW_WIDTH + 55.f, 380.f);
 
@@ -158,6 +158,44 @@ void CUserInterface::UpdateLevel(int level)
 	m_levelText.setString(s);
 }
 
+void CUserInterface::SetSkillOnOff(int skill, bool type)
+{
+	switch (skill) {
+	case 0:
+		if (type) {
+			m_attackcool.setFillColor(sf::Color(0, 0, 0, 180));
+		}
+		else {
+			m_attackcool.setFillColor(sf::Color(0, 0, 0, 0));
+		}
+		break;
+	case 1:
+		if (type) {
+			m_usedskill[0].setFillColor(sf::Color(0, 0, 0, 180));
+		}
+		else {
+			m_usedskill[0].setFillColor(sf::Color(0, 0, 0, 0));
+		}
+		break;
+	case 2:
+		if (type) {
+			m_usedskill[1].setFillColor(sf::Color(0, 0, 0, 180));
+		}
+		else {
+			m_usedskill[1].setFillColor(sf::Color(0, 0, 0, 0));
+		}
+		break;
+	case 3:
+		if (type) {
+			m_usedskill[2].setFillColor(sf::Color(0, 0, 0, 180));
+		}
+		else {
+			m_usedskill[2].setFillColor(sf::Color(0, 0, 0, 0));
+		}
+		break;
+	}
+}
+
 void CUserInterface::Render(sf::RenderWindow& RW)
 {
 	//Render level
@@ -208,26 +246,29 @@ CScene::CScene()
 	m_character = new sf::Texture;
 	m_items = new sf::Texture;
 	m_skills = new sf::Texture;
-	m_enemy = new sf::Texture;
+	for (int i = 0; i < m_enemy.size(); ++i) {
+		m_enemy[i] = new sf::Texture;
+	}
 
 	m_mapTile->loadFromFile("Resource/MapTiles.png");
 	m_character->loadFromFile("Resource/Character.png");
 	m_items->loadFromFile("Resource/Item.png");
 	m_skills->loadFromFile("Resource/Skill.png");
+	m_enemy[0]->loadFromFile("Resource/Enemy.png");
 
 	m_avatar = new CPlayer{ *m_character, 0, 64, 32, 32};
 	m_avatar->set_name("Test");
 
-	m_players = new CMoveObject*[MAX_USER + MAX_NPC];
+	m_objects = new CMoveObject*[MAX_USER + MAX_NPC];
 
 	for (int i = 0; i < MAX_USER + MAX_NPC; ++i) {
 		if (i < MAX_USER) {
-			m_players[i] = new CPlayer{ *m_character, 0, 64, 32, 32};
-			m_players[i]->hide();
+			m_objects[i] = new CPlayer{ *m_character, 0, 64, 32, 32};
+			m_objects[i]->hide();
 		}
 		else {
-			m_players[i] = new CNpc{ *m_enemy, 0, 64, 32, 32};
-			m_players[i]->hide();
+			m_objects[i] = new CNpc{ *m_enemy[0], 0, 64, 32, 32};
+			m_objects[i]->hide();
 		}
 	}
 
@@ -263,15 +304,18 @@ CScene::CScene()
 			}
 		}
 	}
+
+	m_cooltime = {};
 }
 
 CScene::~CScene()
 {
 	delete m_mapTile;
 	delete m_character;
-	delete m_enemy;
 	delete m_items;
 	delete m_skills;
+	for (int i = 0; i < m_enemy.size(); ++i)
+		delete m_enemy[i];
 }
 
 void CScene::Update()
@@ -326,8 +370,8 @@ void CScene::Render(sf::RenderWindow& RW)
 	}
 	m_avatar->draw(RW, m_left, m_top);
 	for (int i = 0; i < MAX_USER + MAX_NPC; ++i) {
-		if(m_players[i] != NULL)
-			m_players[i]->draw(RW, m_left, m_top);
+		if(m_objects[i] != NULL)
+			m_objects[i]->draw(RW, m_left, m_top);
 	}
 
 	sf::Text text;
@@ -363,74 +407,116 @@ void CScene::ProcessLoginInfoPacket(char* ptr)
 
 void CScene::ProcessAddObjectPacket(char* ptr)
 {
-	SC_ADD_OBJECT_PACKET* my_packet = reinterpret_cast<SC_ADD_OBJECT_PACKET*>(ptr);
-	int id = my_packet->id;
+	SC_ADD_OBJECT_PACKET* packet = reinterpret_cast<SC_ADD_OBJECT_PACKET*>(ptr);
+	int id = packet->id;
 
 	if (id == m_id) {
-		m_avatar->move(my_packet->x, my_packet->y);
-		m_left = my_packet->x - 8;
-		m_top = my_packet->y - 8;
+		m_avatar->move(packet->x, packet->y);
+		m_left = packet->x - 8;
+		m_top = packet->y - 8;
 		m_avatar->show();
 	}
 	else if (id < MAX_USER) {
-		//m_players[id] = new CObject{ *m_character, 0, 64, 32, 32};
-		m_players[id]->m_id = id;
-		m_players[id]->move(my_packet->x, my_packet->y);
-		m_players[id]->set_name(my_packet->name);
-		m_players[id]->show();
+		//m_objects[id] = new CObject{ *m_character, 0, 64, 32, 32};
+		m_objects[id]->m_id = id;
+		m_objects[id]->move(packet->x, packet->y);
+		m_objects[id]->set_name(packet->name);
+		m_objects[id]->show();
 	}
 	else {
-		//m_players[id] = new CObject{ *m_enemy, 0, 64, 32, 32};
-		m_players[id]->m_id = id;
-		m_players[id]->move(my_packet->x, my_packet->y);
-		char newname[NAME_SIZE] = { 'N', 'P', 'C' };
-		strcat_s(newname, my_packet->name);
-		m_players[id]->set_name(newname);
-		m_players[id]->show();
+		//m_objects[id] = new CObject{ *m_enemy, 0, 64, 32, 32};
+		m_objects[id]->m_id = id;
+		m_objects[id]->move(packet->x, packet->y);
+		char newname[NAME_SIZE] = { '\0' };
+		strcpy_s(newname, packet->name);
+		m_objects[id]->set_name(newname);
+
+		m_objects[id]->SetCurHp(packet->hp);
+		m_objects[id]->SetMaxHp(packet->max_hp);
+		m_objects[id]->SetLevel(packet->level);
+
+		m_objects[id]->show();
 	}
 }
 
 void CScene::ProcessMoveObjectPacket(char* ptr)
 {
-	SC_MOVE_OBJECT_PACKET* my_packet = reinterpret_cast<SC_MOVE_OBJECT_PACKET*>(ptr);
-	int other_id = my_packet->id;
+	SC_MOVE_OBJECT_PACKET* packet = reinterpret_cast<SC_MOVE_OBJECT_PACKET*>(ptr);
+	int other_id = packet->id;
 	if (other_id == m_id) {
-		m_avatar->move(my_packet->x, my_packet->y);
-		m_left = my_packet->x - 8;
-		m_top = my_packet->y - 8;
-		/*g_left_x = my_packet->x - SCREEN_WIDTH / 2;
-		g_top_y = my_packet->y - SCREEN_HEIGHT / 2;*/
+		m_avatar->move(packet->x, packet->y);
+		m_left = packet->x - 8;
+		m_top = packet->y - 8;
+		/*g_left_x = packet->x - SCREEN_WIDTH / 2;
+		g_top_y = packet->y - SCREEN_HEIGHT / 2;*/
 	}
 	else {
-		m_players[other_id]->move(my_packet->x, my_packet->y);
+		if (m_objects[other_id]->m_x == packet->x) {
+			if (m_objects[other_id]->m_y > packet->y) {
+				m_objects[other_id]->ChangeTex(0, TILE_WIDTH * 0, TILE_WIDTH, TILE_WIDTH);
+			}
+			else {
+				m_objects[other_id]->ChangeTex(0, TILE_WIDTH * 2, TILE_WIDTH, TILE_WIDTH);
+			}
+		}
+		else {
+			if (m_objects[other_id]->m_x > packet->x) {
+				m_objects[other_id]->ChangeTex(0, TILE_WIDTH * 3, TILE_WIDTH, TILE_WIDTH);
+			}
+			else {
+				m_objects[other_id]->ChangeTex(0, TILE_WIDTH * 1, TILE_WIDTH, TILE_WIDTH);
+			}
+		}
+		m_objects[other_id]->move(packet->x, packet->y);
 	}
 }
 
 void CScene::ProcessRemoveObjectPacket(char* ptr)
 {
-	SC_REMOVE_OBJECT_PACKET* my_packet = reinterpret_cast<SC_REMOVE_OBJECT_PACKET*>(ptr);
-	int other_id = my_packet->id;
+	SC_REMOVE_OBJECT_PACKET* packet = reinterpret_cast<SC_REMOVE_OBJECT_PACKET*>(ptr);
+	int other_id = packet->id;
 	if (other_id == m_id) {
 		m_avatar->hide();
 	}
 	else {
-		m_players[other_id]->hide();
+		m_objects[other_id]->hide();
 	}
 }
 
 void CScene::ProcessChatPacket(char* ptr)
 {
-	SC_CHAT_PACKET* my_packet = reinterpret_cast<SC_CHAT_PACKET*>(ptr);
-	int other_id = my_packet->id;
+	SC_CHAT_PACKET* packet = reinterpret_cast<SC_CHAT_PACKET*>(ptr);
+	int other_id = packet->id;
 	if (other_id == m_id) {
-		m_avatar->set_chat(my_packet->mess);
+		m_avatar->set_chat(packet->mess);
 	}
 	else {
-		m_players[other_id]->set_chat(my_packet->mess);
+		m_objects[other_id]->set_chat(packet->mess);
 	}
+}
+
+void CScene::ProcessDamagePacket(char* ptr)
+{
+	SC_DAMAGE_PACKET* packet = reinterpret_cast<SC_DAMAGE_PACKET*>(ptr);
+	m_objects[packet->id]->SetCurHp(packet->hp);
+	dynamic_cast<CNpc*>(m_objects[packet->id])->UpdateHPBar();
 }
 
 void CScene::ChangeAvartarTex(int x, int y, int x2, int y2)
 {
 	m_avatar->ChangeTex(x, y, x2, y2);
+}
+
+void CScene::SetSkillOnOff(int skill, bool type)
+{
+	switch (skill) {
+	case 0:
+	case 1:
+	case 2:
+	case 3:
+		m_interface->SetSkillOnOff(skill, type);
+		break;
+	default:
+		break;
+	}
 }
