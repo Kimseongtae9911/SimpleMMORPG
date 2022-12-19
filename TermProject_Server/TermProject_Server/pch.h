@@ -9,6 +9,8 @@
 #include <array>
 #include <vector>
 #include <unordered_set>
+#include <set>
+#include <stack>
 #include <concurrent_priority_queue.h>
 #include "protocol.h"
 
@@ -25,20 +27,22 @@ extern "C" {
 using namespace std;
 
 constexpr int VIEW_RANGE = 7;
+constexpr int MONSTER_VIEW = 5;
 constexpr int INIT_EXP = 10;
 constexpr int EXP_UP = 40;
+constexpr int INF = 2140000000;
 
 enum class DIR {LEFT, RIGHT, UP, DOWN};
 
-enum class OP_TYPE { OP_ACCEPT, OP_RECV, OP_SEND, OP_NPC_MOVE, OP_AI_HELLO };
+enum class OP_TYPE { OP_ACCEPT, OP_RECV, OP_SEND, OP_NPC_MOVE, OP_AI_HELLO, OP_PLAYER_HEAL };
 
 enum class CL_STATE {ST_FREE, ST_ALLOC, ST_INGAME};
 
-enum ITEM_TYPE {NONE, MONEY, HP_POTION, MP_POTION, WAND, CLOTH, RING, HAT};
+enum ITEM_TYPE { NONE, MONEY, HP_POTION, MP_POTION, WAND, CLOTH, RING, HAT };
 
-enum MONSTER_TYPE {};
+enum MONSTER_TYPE { AGRO, PEACE };
 
-enum EVENT_TYPE { EV_RANDOM_MOVE };
+enum EVENT_TYPE { EV_RANDOM_MOVE, EV_CHASE_PLAYER, EV_ATTACK_PLAYER, EV_PLAYER_HEAL };
 
 struct TIMER_EVENT {
 	int obj_id;
@@ -49,6 +53,22 @@ struct TIMER_EVENT {
 	{
 		return (wakeup_time > L.wakeup_time);
 	}
+};
+
+struct WeightPos {
+	double weight;
+	int x;
+	int y;
+
+	constexpr bool operator < (const WeightPos& R) const
+	{
+		return (weight < R.weight);
+	}
+};
+
+struct Node {
+	int parentX, parentY;
+	double h, f, g;
 };
 
 #pragma pack (push, 1)

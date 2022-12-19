@@ -18,22 +18,13 @@ int Get_NewID();
 bool Can_See(int from, int to);
 bool Can_Move(short x, short y, char dir);
 bool Can_Use(int id, char skill, chrono::system_clock::time_point time);
+bool Agro(int from, int to);
 
-void WakeUpNPC(int npc_id, int waker)
-{
-	OVER_EXP* exover = new OVER_EXP;
-	exover->m_comp_type = OP_TYPE::OP_AI_HELLO;
-	exover->m_ai_target_obj = waker;
-	PostQueuedCompletionStatus(h_iocp, 1, npc_id, &exover->m_over);
-
-	if (dynamic_cast<CNpc*>(clients[npc_id])->m_active) 
-		return;
-	bool old_state = false;
-	if (false == atomic_compare_exchange_strong(&dynamic_cast<CNpc*>(clients[npc_id])->m_active, &old_state, true))
-		return;
-	TIMER_EVENT ev{ npc_id, chrono::system_clock::now(), EV_RANDOM_MOVE, 0 };
-	timer_queue.push(ev);
-}
+void WakeUpNPC(int npc_id, int waker);
+void do_npc_random_move(int npc_id);
+void do_npc_chase(int npc_id);
+void do_npc_attack(int npc_id);
+bool AStar(int startX, int startY, int destX, int destY, int* x, int* y);
 
 void process_packet(int c_id, char* packet)
 {
@@ -135,7 +126,9 @@ void process_packet(int c_id, char* packet)
 						clients[pl]->Send_AddObject_Packet(c_id);
 					}
 				}
-				else WakeUpNPC(pl, c_id);
+				else {
+					WakeUpNPC(pl, c_id);
+				}
 
 				if (old_vlist.count(pl) == 0)
 					clients[c_id]->Send_AddObject_Packet(pl);
@@ -211,70 +204,6 @@ void disconnect(int c_id)
 
 	lock_guard<mutex> ll(clients[c_id]->m_StateLock);
 	clients[c_id]->SetState(CL_STATE::ST_FREE);
-}
-
-void do_npc_random_move(int npc_id)
-{
-	CObject* npc = clients[npc_id];
-
-	// 해당 NPC가 시야에 있는 플레이어들
-	unordered_set<int> old_vl;
-	for (auto& obj : clients) {
-		if (CL_STATE::ST_INGAME != obj->GetState()) 
-			continue;
-		if (obj->GetID() >= MAX_USER)
-			continue;
-		if (true == Can_See(npc->GetID(), obj->GetID()))
-			old_vl.insert(obj->GetID());
-	}
-
-	int x = npc->GetPosX();
-	int y = npc->GetPosY();
-	int dir = rand() % 4;
-	if (Can_Move(x, y, dir)) {
-		switch (dir) {
-		case 0:	y--; break;
-		case 1:	y++; break;
-		case 2:	x--; break;
-		case 3:	x++; break;
-		}
-		npc->SetPos(x, y);
-	}
-
-	// 움직인 이후에 해당 NPC가 시야에 있는 플레이어들
-	unordered_set<int> new_vl;
-	for (auto& obj : clients) {
-		if (CL_STATE::ST_INGAME != obj->GetState()) 
-			continue;
-		if (obj->GetID() >= MAX_USER) 
-			continue;
-		if (true == Can_See(npc->GetID(), obj->GetID()))
-			new_vl.insert(obj->GetID());
-	}
-
-	for (auto pl : new_vl) {
-		// new_vl에는 있는데 old_vl에는 없을 때 플레이어의 시야에 등장
-		if (0 == old_vl.count(pl)) {
-			clients[pl]->Send_AddObject_Packet(npc->GetID());
-		}
-		else {
-			// 플레이어가 계속 보고 있음.
-			clients[pl]->Send_Move_Packet(npc->GetID());
-		}
-	}
-	
-	for (auto pl : old_vl) {
-		if (0 == new_vl.count(pl)) {
-			clients[pl]->m_ViewLock.lock();
-			if (0 != clients[pl]->GetViewList().count(npc->GetID())) {
-				clients[pl]->m_ViewLock.unlock();
-				clients[pl]->Send_RemoveObject_Packet(npc->GetID());
-			}
-			else {
-				clients[pl]->m_ViewLock.unlock();
-			}
-		}
-	}
 }
 
 void worker_thread(HANDLE h_iocp);
@@ -384,31 +313,71 @@ void worker_thread(HANDLE h_iocp)
 			break;
 		case OP_TYPE::OP_NPC_MOVE: {
 			bool keep_alive = false;
-			for (int j = 0; j < MAX_USER; ++j)
+			bool chase = false;
+			bool attack = false;
+			for (int j = 0; j < MAX_USER; ++j) {
 				if (Can_See(static_cast<int>(key), j)) {
 					keep_alive = true;
+					if (MONSTER_TYPE::AGRO == dynamic_cast<CNpc*>(clients[static_cast<int>(key)])->GetMonType() && Agro(static_cast<int>(key), j)) {
+						chase = true;
+						if (abs(clients[j]->GetPosX() - clients[static_cast<int>(key)]->GetPosX()) + abs(clients[j]->GetPosY() - clients[static_cast<int>(key)]->GetPosY()) <= 1) {
+							attack = true;
+						}
+					}
+					else {
+						// Peace 몬스터 처리
+					}
 					break;
 				}
+			}
 			if (true == keep_alive) {
-				do_npc_random_move(static_cast<int>(key));
-				TIMER_EVENT ev{ key, chrono::system_clock::now() + 1s, EV_RANDOM_MOVE, 0 };
-				timer_queue.push(ev);
+				if (true == attack) {
+					do_npc_attack(static_cast<int>(key));
+					TIMER_EVENT ev{ key, chrono::system_clock::now() + 1s, EV_ATTACK_PLAYER, dynamic_cast<CNpc*>(clients[static_cast<int>(key)])->GetTarget() };
+					timer_queue.push(ev);
+				}
+				else if (true == chase) {
+					dynamic_cast<CNpc*>(clients[static_cast<int>(key)])->SetChase(true);
+					do_npc_chase(static_cast<int>(key));
+					TIMER_EVENT ev{ key, chrono::system_clock::now() + 1s, EV_CHASE_PLAYER, dynamic_cast<CNpc*>(clients[static_cast<int>(key)])->GetTarget() };
+					timer_queue.push(ev);
+				}
+				else {
+					dynamic_cast<CNpc*>(clients[static_cast<int>(key)])->SetChase(false);
+					do_npc_random_move(static_cast<int>(key));
+					TIMER_EVENT ev{ key, chrono::system_clock::now() + 1s, EV_RANDOM_MOVE, 0 };
+					timer_queue.push(ev);
+				}
 			}
 			else {
-				dynamic_cast<CNpc*>(clients[key])->m_active = false;
+				dynamic_cast<CNpc*>(clients[static_cast<int>(key)])->m_active = false;
 			}
 			delete ex_over;
 		}
 			break;
 		case OP_TYPE::OP_AI_HELLO:
-			dynamic_cast<CNpc*>(clients[key])->LuaLock.lock();
-			lua_getglobal(dynamic_cast<CNpc*>(clients[key])->GetLua(), "event_player_move");
-			lua_pushnumber(dynamic_cast<CNpc*>(clients[key])->GetLua(), ex_over->m_ai_target_obj);
-			lua_pcall(dynamic_cast<CNpc*>(clients[key])->GetLua(), 1, 0, 0);
-			lua_pop(dynamic_cast<CNpc*>(clients[key])->GetLua(), 1);
-			dynamic_cast<CNpc*>(clients[key])->LuaLock.unlock();
+			dynamic_cast<CNpc*>(clients[static_cast<int>(key)])->LuaLock.lock();
+			lua_getglobal(dynamic_cast<CNpc*>(clients[static_cast<int>(key)])->GetLua(), "event_player_move");
+			lua_pushnumber(dynamic_cast<CNpc*>(clients[static_cast<int>(key)])->GetLua(), ex_over->m_ai_target_obj);
+			lua_pcall(dynamic_cast<CNpc*>(clients[static_cast<int>(key)])->GetLua(), 1, 0, 0);
+			lua_pop(dynamic_cast<CNpc*>(clients[static_cast<int>(key)])->GetLua(), 1);
+			dynamic_cast<CNpc*>(clients[static_cast<int>(key)])->LuaLock.unlock();
 			delete ex_over;
 			break;
+		case OP_TYPE::OP_PLAYER_HEAL: {
+			CPlayer* player = dynamic_cast<CPlayer*>(clients[static_cast<int>(key)]);
+			if (player->GetCurHp() < player->GetMaxHp()) {
+				player->SetCurHp(player->GetCurHp() + static_cast<int>(player->GetMaxHp() * 0.1f));
+			}
+			if (player->GetCurHp() > player->GetMaxHp())
+				player->SetCurHp(player->GetMaxHp());
+
+			if (player->GetCurHp() < player->GetMaxHp()) {
+				TIMER_EVENT ev{ static_cast<int>(key), chrono::system_clock::now() + 5s, EV_PLAYER_HEAL, 0};
+				timer_queue.push(ev);
+			}
+			break;
+		}
 		}
 	}
 }
@@ -424,14 +393,19 @@ void timer_func()
 				this_thread::sleep_for(1ms);
 				continue;
 			}
-			if (clients[ev.obj_id]->GetCurHp() > 0.f) {
-				switch (ev.event_id) {
-				case EV_RANDOM_MOVE:
-					OVER_EXP* ov = new OVER_EXP;
-					ov->m_comp_type = OP_TYPE::OP_NPC_MOVE;
-					PostQueuedCompletionStatus(h_iocp, 1, ev.obj_id, &ov->m_over);
-					break;
-				}
+			switch (ev.event_id) {
+			case EV_RANDOM_MOVE:
+			case EV_CHASE_PLAYER:
+			case EV_ATTACK_PLAYER:
+				OVER_EXP* ov = new OVER_EXP;
+				ov->m_comp_type = OP_TYPE::OP_NPC_MOVE;
+				PostQueuedCompletionStatus(h_iocp, 1, ev.obj_id, &ov->m_over);
+				break;
+			case EV_PLAYER_HEAL:
+				OVER_EXP* ov = new OVER_EXP;
+				ov->m_comp_type = OP_TYPE::OP_PLAYER_HEAL;
+				PostQueuedCompletionStatus(h_iocp, 1, ev.obj_id, &ov->m_over);
+				break;
 			}
 			timer_queue.try_pop(ev);
 			continue;
@@ -582,5 +556,300 @@ bool Can_Use(int id, char skill, chrono::system_clock::time_point time)
 		}
 		break;
 	}
+	return false;
+}
+
+bool Agro(int from, int to) {
+	if (abs(clients[from]->GetPosX() - clients[to]->GetPosX()) > MONSTER_VIEW)
+		return false;
+
+	return abs(clients[from]->GetPosY() - clients[to]->GetPosY()) <= MONSTER_VIEW;
+}
+
+void WakeUpNPC(int npc_id, int waker)
+{
+	OVER_EXP* exover = new OVER_EXP;
+	exover->m_comp_type = OP_TYPE::OP_AI_HELLO;
+	exover->m_ai_target_obj = waker;
+	PostQueuedCompletionStatus(h_iocp, 1, npc_id, &exover->m_over);
+
+	if (dynamic_cast<CNpc*>(clients[npc_id])->m_active)
+		return;
+	bool old_state = false;
+	if (false == atomic_compare_exchange_strong(&dynamic_cast<CNpc*>(clients[npc_id])->m_active, &old_state, true))
+		return;
+	TIMER_EVENT ev{ npc_id, chrono::system_clock::now(), EV_RANDOM_MOVE, 0 };
+	timer_queue.push(ev);
+}
+
+void do_npc_random_move(int npc_id)
+{
+	CObject* npc = clients[npc_id];
+
+	// 해당 NPC가 시야에 있는 플레이어들
+	unordered_set<int> old_vl;
+	for (auto& obj : clients) {
+		if (CL_STATE::ST_INGAME != obj->GetState()) 
+			continue;
+		if (obj->GetID() >= MAX_USER)
+			continue;
+		if (true == Can_See(npc->GetID(), obj->GetID()))
+			old_vl.insert(obj->GetID());
+	}
+
+	int x = npc->GetPosX();
+	int y = npc->GetPosY();
+	int dir = rand() % 4;
+	if (Can_Move(x, y, dir)) {
+		switch (dir) {
+		case 0:	y--; break;
+		case 1:	y++; break;
+		case 2:	x--; break;
+		case 3:	x++; break;
+		}
+		npc->SetPos(x, y);
+	}
+
+	// 움직인 이후에 해당 NPC가 시야에 있는 플레이어들
+	unordered_set<int> new_vl;
+	for (auto& obj : clients) {
+		if (CL_STATE::ST_INGAME != obj->GetState()) 
+			continue;
+		if (obj->GetID() >= MAX_USER) 
+			continue;
+		if (true == Can_See(npc->GetID(), obj->GetID()))
+			new_vl.insert(obj->GetID());
+	}
+
+	for (auto pl : new_vl) {
+		// new_vl에는 있는데 old_vl에는 없을 때 플레이어의 시야에 등장
+		if (0 == old_vl.count(pl)) {
+			clients[pl]->Send_AddObject_Packet(npc->GetID());
+		}
+		else {
+			// 플레이어가 계속 보고 있음.
+			clients[pl]->Send_Move_Packet(npc->GetID());
+		}
+	}
+	
+	for (auto pl : old_vl) {
+		if (0 == new_vl.count(pl)) {
+			clients[pl]->m_ViewLock.lock();
+			if (0 != clients[pl]->GetViewList().count(npc->GetID())) {
+				clients[pl]->m_ViewLock.unlock();
+				clients[pl]->Send_RemoveObject_Packet(npc->GetID());
+			}
+			else {
+				clients[pl]->m_ViewLock.unlock();
+			}
+		}
+	}
+}
+
+void do_npc_chase(int npc_id)
+{
+	CNpc* npc = dynamic_cast<CNpc*>(clients[npc_id]);
+
+	// 해당 NPC가 시야에 있는 플레이어들
+	unordered_set<int> old_vl;
+	for (auto& obj : clients) {
+		if (CL_STATE::ST_INGAME != obj->GetState())
+			continue;
+		if (obj->GetID() >= MAX_USER)
+			continue;
+		if (true == Can_See(npc->GetID(), obj->GetID()))
+			old_vl.insert(obj->GetID());
+	}
+	
+	int x = 0;
+	int y = 0;
+	if (AStar(npc->GetPosX(), npc->GetPosY(), clients[npc->GetTarget()]->GetPosX(), clients[npc->GetTarget()]->GetPosY(), &x, &y))
+	{
+		npc->SetPos(x, y);
+	}
+	else cout << "Failed to Find Path" << endl;
+
+	// 움직인 이후에 해당 NPC가 시야에 있는 플레이어들
+	unordered_set<int> new_vl;
+	for (auto& obj : clients) {
+		if (CL_STATE::ST_INGAME != obj->GetState())
+			continue;
+		if (obj->GetID() >= MAX_USER)
+			continue;
+		if (true == Can_See(npc->GetID(), obj->GetID()))
+			new_vl.insert(obj->GetID());
+	}
+
+	for (auto pl : new_vl) {
+		// new_vl에는 있는데 old_vl에는 없을 때 플레이어의 시야에 등장
+		if (0 == old_vl.count(pl)) {
+			clients[pl]->Send_AddObject_Packet(npc->GetID());
+		}
+		else {
+			// 플레이어가 계속 보고 있음.
+			clients[pl]->Send_Move_Packet(npc->GetID());
+		}
+	}
+
+	for (auto pl : old_vl) {
+		if (0 == new_vl.count(pl)) {
+			clients[pl]->m_ViewLock.lock();
+			if (0 != clients[pl]->GetViewList().count(npc->GetID())) {
+				clients[pl]->m_ViewLock.unlock();
+				clients[pl]->Send_RemoveObject_Packet(npc->GetID());
+			}
+			else {
+				clients[pl]->m_ViewLock.unlock();
+			}
+		}
+	}
+}
+
+void do_npc_attack(int npc_id)
+{
+	CNpc* npc = dynamic_cast<CNpc*>(clients[npc_id]);
+	CPlayer* player = dynamic_cast<CPlayer*>(clients[npc->GetTarget()]);
+
+	player->SetCurHp(player->GetCurHp() - npc->GetPower());
+	if (player->GetCurHp() <= 0)
+		cout << "Player Die" << endl;
+	else {
+		player->Send_StatChange_Packet();
+	}
+
+	TIMER_EVENT ev{ npc->GetTarget(), chrono::system_clock::now() + 5s, EV_PLAYER_HEAL, 0 };
+	timer_queue.push(ev);
+}
+
+bool IsDest(int startX, int startY, int destX, int destY)
+{
+	if (startX == destX && startY == destY)
+		return true;
+
+	return false;
+}
+
+bool IsValid(int x, int y)
+{
+	return (x >= 0 && x < W_WIDTH && y >= 0 && y < W_HEIGHT);
+}
+
+bool IsUnBlocked(int x, int y)
+{
+	if (g_tilemap[y][x] == 'D' || g_tilemap[y][x] == 'G')
+		return true;
+
+	return false;
+}
+
+double CalH(int x, int y, int destX, int destY)
+{
+	return (abs(x - destX) + abs(y - destY));
+}
+
+void FindPath(Node* node[], int destX, int destY, int* x, int* y) 
+{
+	stack<Node> s;
+	s.push({ destX, destY });
+	while (!(node[destY][destX].parentX == destX && node[destY][destX].parentY == destY)) {
+		int tempx = node[destY][destX].parentX;
+		int tempy = node[destY][destX].parentY;
+		destX = tempx;
+		destY = tempy;
+		s.push({ destX, destY });
+	}
+
+	s.pop();
+	*x = s.top().parentX;
+	*y = s.top().parentY;
+
+	for (int i = 0; i < W_HEIGHT; ++i)
+		delete[] node[i];
+	
+	delete[] node;
+}
+
+bool AStar(int startX, int startY, int destX, int destY, int* resultx, int* resulty)
+{
+	int dx1[4] = { 0, 0, 1, -1 };
+	int dy1[4] = { -1, 1, 0, 0 };
+
+	if (!IsValid(startX, startY) || !IsValid(destX, destY)) return false;
+	if (!IsUnBlocked(startX, startY) || !IsUnBlocked(destX, destY)) return false;
+	if (IsDest(startX, startY, destX, destY)) return false;
+
+	bool** closedList = new bool*[W_HEIGHT];
+	for (int i = 0; i < W_HEIGHT; ++i) {
+		closedList[i] = new bool[W_WIDTH];		
+
+		for (int j = 0; j < W_WIDTH; ++j) {
+			closedList[i][j] = false;
+		}
+	}
+
+	Node** node = new Node * [W_HEIGHT];
+	for (int i = 0; i < W_HEIGHT; ++i) {
+		node[i] = new Node[W_WIDTH];
+	}
+
+	for (int i = 0; i < W_HEIGHT; ++i) {
+		for (int j = 0; j < W_WIDTH; ++j) {
+			node[i][j].f = node[i][j].g = node[i][j].h = INF;
+			node[i][j].parentX = node[i][j].parentY = -1;
+		}
+	}
+
+	node[startY][startX].f = node[startY][startX].g = node[startY][startX].h = 0.f;
+	node[startY][startX].parentX = startX;
+	node[startY][startX].parentY = startY;
+
+	set<WeightPos> openList;
+	openList.insert({ 0.f, startX, startY });
+
+	while (!openList.empty()) {
+		WeightPos wp = *openList.begin();
+		openList.erase(openList.begin());
+
+		int x = wp.x;
+		int y = wp.y;
+
+		closedList[y][x] = true;
+
+		double nf, ng, nh;
+
+		for (int i = 0; i < 4; ++i) {
+			int ny = y + dy1[i];
+			int nx = x + dx1[i];
+
+			if (IsValid(nx, ny)) {
+				if (IsDest(nx, ny, destX, destY)) {
+					node[ny][nx].parentX = x;
+					node[ny][nx].parentY = y;
+					FindPath(node, destX, destY, resultx, resulty);
+					for (int i = 0; i < W_HEIGHT; ++i) {
+						delete[] closedList[i];
+					}
+					delete[] closedList;
+					return true;
+				}
+				else if (!closedList[ny][nx] && IsUnBlocked(nx, ny)) {
+					ng = node[y][x].g + 1.0f;
+					nh = CalH(nx, ny, destX, destY);
+					nf = ng + nh;
+
+					if (node[ny][nx].f == INF || node[ny][nx].f > nf) {
+						node[ny][nx].f = nf;
+						node[ny][nx].g = ng;
+						node[ny][nx].h = nh;
+						node[ny][nx].parentX = x;
+						node[ny][nx].parentY = y;
+
+						openList.insert({ nf, nx, ny });
+					}
+				}
+			}
+		}
+	}
+
 	return false;
 }

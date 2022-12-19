@@ -276,7 +276,10 @@ void CPlayer::Attack()
 			if (clients[cid]->GetCurHp() <= 0.f) {
 				remove = true;
 				dynamic_cast<CNpc*>(clients[cid])->m_active = false;
-				GainExp(clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2);
+				int exp = clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2;
+				if (dynamic_cast<CNpc*>(clients[cid])->GetMonType() == MONSTER_TYPE::AGRO)
+					exp *= 2;
+				GainExp(exp);
 				Send_StatChange_Packet();
 				CreateItem(clients[cid]->GetPosX(), clients[cid]->GetPosY());
 			}
@@ -356,7 +359,10 @@ void CPlayer::Skill2()
 			if (clients[cid]->GetCurHp() <= 0) {
 				remove = true;
 				dynamic_cast<CNpc*>(clients[cid])->m_active = false;
-				GainExp(clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2);
+				int exp = clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2;
+				if (dynamic_cast<CNpc*>(clients[cid])->GetMonType() == MONSTER_TYPE::AGRO)
+					exp *= 2;
+				GainExp(exp);
 				Send_StatChange_Packet();
 				CreateItem(clients[cid]->GetPosX(), clients[cid]->GetPosY());
 			}
@@ -412,7 +418,10 @@ void CPlayer::Skill3()
 			if (clients[cid]->GetCurHp() <= 0) {
 				remove = true;
 				dynamic_cast<CNpc*>(clients[cid])->m_active = false;
-				GainExp(clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2);
+				int exp = clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2;
+				if (dynamic_cast<CNpc*>(clients[cid])->GetMonType() == MONSTER_TYPE::AGRO)
+					exp *= 2;
+				GainExp(exp);
 				Send_StatChange_Packet();
 				CreateItem(clients[cid]->GetPosX(), clients[cid]->GetPosY());
 			}
@@ -480,7 +489,6 @@ void CPlayer::CreateItem(short x, short y)
 	}
 
 	if (ITEM_TYPE::NONE != item_type) {
-		cout << "Generate Item" << endl;
 		SC_ITEM_ADD_PACKET p;
 		p.type = SC_ITEM_ADD;
 		p.size = sizeof(p);
@@ -495,14 +503,18 @@ void CPlayer::CreateItem(short x, short y)
 void CPlayer::UseItem(int inven)
 {
 	if (true == m_items[inven]->GetEnable()) {
-		int use = false;
+		bool use = false;
 		switch (m_items[inven]->GetItemType()) {
 		case ITEM_TYPE::HP_POTION:
-			m_curHp -= 10;
+			m_curHp += 50;
+			if (m_curHp > m_maxHp)
+				m_curHp = m_maxHp;
 			use = true;
 			break;
 		case ITEM_TYPE::MP_POTION:
-			m_curMp -= 10;
+			m_curMp += 30;
+			if (m_curMp > m_maxMp)
+				m_curMp = m_maxMp;
 			use = true;
 			break;
 		default:

@@ -258,6 +258,7 @@ CScene::CScene()
 	m_items->loadFromFile("Resource/Items.png");
 	m_skills->loadFromFile("Resource/Skill.png");
 	m_enemy[0]->loadFromFile("Resource/Enemy.png");
+	m_enemy[1]->loadFromFile("Resource/Enemy2.png");
 
 	m_avatar = new CPlayer{ *m_character, 0, 64, 32, 32};
 	m_avatar->set_name("Test");
@@ -269,8 +270,12 @@ CScene::CScene()
 			m_objects[i] = new CPlayer{ *m_character, 0, 64, 32, 32};
 			m_objects[i]->hide();
 		}
-		else {
+		else if(i < (MAX_NPC) / 2 + MAX_USER) {
 			m_objects[i] = new CNpc{ *m_enemy[0], 0, 64, 32, 32};
+			m_objects[i]->hide();
+		}
+		else {
+			m_objects[i] = new CNpc{ *m_enemy[1], 0, 64, 32, 32 };
 			m_objects[i]->hide();
 		}
 	}

@@ -106,9 +106,13 @@ public:
 
 	void SetMonType(MONSTER_TYPE type) { m_monType = type; }
 	void SetRespawnPos(short x, short y) { m_respawnX = x; m_respawnY = y; }
+	void SetChase(bool chase) { m_chase = chase; }
+	void SetTarget(int target) { m_target = target; }
 
 	lua_State* GetLua() { return m_L; }
 	const MONSTER_TYPE GetMonType() const { return m_monType; }
+	const bool GetChase() const { return m_chase; }
+	const int GetTarget() const { return m_target; }
 
 public:
 	atomic_bool	m_active;
@@ -118,6 +122,9 @@ private:
 	lua_State* m_L;	
 	MONSTER_TYPE m_monType;
 	short m_respawnX, m_respawnY;
+
+	bool m_chase;
+	int m_target;
 };
 
 class CPlayer : public CObject

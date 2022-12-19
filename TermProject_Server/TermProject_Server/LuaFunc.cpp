@@ -34,6 +34,11 @@ int API_Initialize(lua_State* L)
 	clients[id]->SetMaxHp(80 + clients[id]->GetLevel() * 50);
 	clients[id]->SetCurHp(clients[id]->GetMaxHp());
 	clients[id]->SetPower(10 + clients[id]->GetLevel() * 5);
+	
+	if(id <= (MAX_NPC / 2) + MAX_USER)
+		dynamic_cast<CNpc*>(clients[id])->SetMonType(MONSTER_TYPE::AGRO);
+	else
+		dynamic_cast<CNpc*>(clients[id])->SetMonType(MONSTER_TYPE::PEACE);
 
 	return 1;
 }
