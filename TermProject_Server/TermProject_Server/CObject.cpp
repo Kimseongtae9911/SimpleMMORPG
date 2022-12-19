@@ -1,9 +1,13 @@
 #include "pch.h"
 #include "CObject.h"
 #include "LuaFunc.h"
+#include "CItem.h"
 
 extern HANDLE h_iocp;
 extern array<CObject*, MAX_USER + MAX_NPC> clients;
+
+ITEM_TYPE itemmap[W_HEIGHT][W_WIDTH] = { NONE, };
+
 CObject::CObject()
 {
 	m_ID = -1;
@@ -110,13 +114,16 @@ void CObject::Send_RemoveObject_Packet(int c_id)
 	SendPacket(&p);
 }
 
+const bool CObject::CanSee(int from, int to) const
+{
+	if (abs(clients[from]->GetPosX() - clients[to]->GetPosX()) > VIEW_RANGE)
+		return false;
+
+	return abs(clients[from]->GetPosY() - clients[to]->GetPosY()) <= VIEW_RANGE;
+}
+
 CNpc::CNpc(int id)
 {
-	m_level = 1;
-	m_curHp = 100;
-	m_maxHp = 100;
-	m_PosX = rand() % W_WIDTH;
-	m_PosY = rand() % W_HEIGHT;
 	m_ID = id;
 	sprintf_s(m_Name, "NPC%d", id);
 	m_State = CL_STATE::ST_INGAME;
@@ -127,11 +134,7 @@ CNpc::CNpc(int id)
 	luaL_loadfile(L, "npc.lua");
 	lua_pcall(L, 0, 0, 0);
 
-	lua_getglobal(L, "set_uid");
-	lua_pushnumber(L, id);
-	lua_pcall(L, 1, 0, 0);
-	//lua_pop(L, 1);
-
+	lua_register(L, "API_Initialize", API_Initialize);
 	lua_register(L, "API_SendMessage", API_SendMessage);
 	lua_register(L, "API_get_x", API_get_x);
 	lua_register(L, "API_get_y", API_get_y);
@@ -141,7 +144,7 @@ CNpc::~CNpc()
 {
 }
 
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 CPlayer::CPlayer()
 {
@@ -149,6 +152,9 @@ CPlayer::CPlayer()
 	m_power = 20;
 	m_poweruptime = {};
 	m_powerup = false;
+	for (int i = 0; i < m_items.size(); ++i) {
+		m_items[i] = new CItem();
+	}
 }
 
 CPlayer::~CPlayer()
@@ -165,6 +171,353 @@ void CPlayer::PlayerAccept(int id, SOCKET sock)
 	m_Socket = sock;
 	CreateIoCompletionPort(reinterpret_cast<HANDLE>(m_Socket), h_iocp, id, 0);
 	RecvPacket();
+}
+
+void CPlayer::CheckItem()
+{
+	if (ITEM_TYPE::NONE != itemmap[m_PosY][m_PosX]) {
+		int index = -1;
+		bool money = false;
+		if (ITEM_TYPE::MONEY == itemmap[m_PosY][m_PosX]) {
+			for (int i = 0; i < m_items.size(); ++i) {
+				if (false == m_items[i]->GetEnable() && -1 == index) {
+					index = i;
+				}
+				if (ITEM_TYPE::MONEY == m_items[i]->GetItemType()) {
+					money = true;
+					index = i;
+					m_itemLock.lock();
+					m_items[i]->SetNum(m_items[i]->GetNum() + 1);
+					m_itemLock.unlock();
+					break;
+				}
+			}
+			if (false == money) {
+				m_itemLock.lock();
+				m_items[index]->SetEnable(true);
+				m_items[index]->SetItemType(itemmap[m_PosY][m_PosX]);
+				m_itemLock.unlock();
+			}
+		}
+		else {
+			for (int i = 0; i < m_items.size(); ++i) {
+				if (false == m_items[i]->GetEnable()) {
+					index = i;
+					m_itemLock.lock();
+					m_items[i]->SetEnable(true);
+					m_items[i]->SetItemType(itemmap[m_PosY][m_PosX]);
+					m_itemLock.unlock();
+ 					break;
+				}
+			}
+		}
+
+		if (-1 != index) {
+			SC_ITEM_GET_PACKET p;
+			p.size = sizeof(p);
+			p.type = SC_ITEM_GET;
+			p.inven_num = index;
+			p.item_type = m_items[index]->GetItemType();
+			p.x = m_PosX;
+			p.y = m_PosY;
+			SendPacket(&p);
+		}
+		itemmap[m_PosY][m_PosX] = ITEM_TYPE::NONE;
+	}
+}
+
+void CPlayer::Attack()
+{
+	m_ViewLock.lock();
+	auto v_list = m_view_list;
+	m_ViewLock.unlock();
+
+	for (const auto id : v_list) {
+		if (id < MAX_USER)
+			continue;
+		int cid = -1;
+		if (clients[id]->GetPosX() == m_PosX && clients[id]->GetPosY() + 1 == m_PosY) {
+			//아래있는 몬스터
+			cid = id;
+		}
+		else if (clients[id]->GetPosX() == m_PosX && clients[id]->GetPosY() - 1 == m_PosY) {
+			//위에 있는 몬스터
+			cid = id;
+		}
+		else if (clients[id]->GetPosY() == m_PosY && clients[id]->GetPosX() + 1 == m_PosX) {
+			//오른족에 있는 몬스터
+			cid = id;
+		}
+		else if (clients[id]->GetPosY() == m_PosY && clients[id]->GetPosX() - 1 == m_PosX) {
+			//왼쪽에 있는 몬스터
+			cid = id;
+		}
+		if (-1 != cid) {
+			if (true == m_powerup) {
+				if (chrono::duration_cast<chrono::seconds>(chrono::system_clock::now() - m_poweruptime).count() >= POWERUP_TIME) {
+					m_powerup = false;
+					m_power /= 2;
+				}
+			}
+
+			vector<int> see_monster;
+			for (auto& obj : clients) {
+				if (CL_STATE::ST_INGAME != obj->GetState())
+					continue;
+				if (obj->GetID() >= MAX_USER)
+					break;
+				if (true == obj->CanSee(clients[id]->GetID(), obj->GetID()))
+					see_monster.emplace_back(obj->GetID());
+			}
+
+			clients[cid]->SetCurHp(clients[cid]->GetCurHp() - m_power * 3);
+
+			bool remove = false;
+			if (clients[cid]->GetCurHp() <= 0.f) {
+				remove = true;
+				dynamic_cast<CNpc*>(clients[cid])->m_active = false;
+				GainExp(clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2);
+				Send_StatChange_Packet();
+				CreateItem(clients[cid]->GetPosX(), clients[cid]->GetPosY());
+			}
+
+			for (const auto id : see_monster) {
+				dynamic_cast<CPlayer*>(clients[id])->Send_Damage_Packet(cid, 3);
+				if (true == remove)
+					clients[id]->Send_RemoveObject_Packet(cid);
+			}
+		}
+	}	
+}
+
+void CPlayer::Skill1()
+{
+	m_poweruptime = chrono::system_clock::now();
+	m_powerup = true;
+}
+
+void CPlayer::Skill2()
+{
+	m_ViewLock.lock();
+	auto v_list = m_view_list;
+	m_ViewLock.unlock();
+
+	//Collision
+	for (const auto id : v_list) {
+		if (id < MAX_USER)
+			continue;
+
+		int cid = -1;
+		for (int i = 1; i < 5; ++i) {
+			switch (m_dir) {
+			case DIR::DOWN:
+				if (clients[id]->GetPosX() == m_PosX && clients[id]->GetPosY() - i == m_PosY) {
+					cid = id;
+				}
+				break;
+			case DIR::UP:
+				if (clients[id]->GetPosX() == m_PosX && clients[id]->GetPosY() + i == m_PosY) {
+					cid = id;
+				}
+				break;
+			case DIR::LEFT:
+				if (clients[id]->GetPosX() + i == m_PosX && clients[id]->GetPosY() == m_PosY) {
+					cid = id;
+				}
+				break;
+			case DIR::RIGHT:
+				if (clients[id]->GetPosX() - i == m_PosX && clients[id]->GetPosY() == m_PosY) {
+					cid = id;
+				}
+				break;
+			}
+		}
+		if (-1 != cid) {
+			if (true == m_powerup) {
+				if (chrono::duration_cast<chrono::seconds>(chrono::system_clock::now() - m_poweruptime).count() >= POWERUP_TIME) {
+					m_powerup = false;
+					m_power /= 2;
+				}
+			}
+			
+			vector<int> see_monster;
+			for (auto& obj : clients) {
+				if (CL_STATE::ST_INGAME != obj->GetState())
+					continue;
+				if (obj->GetID() >= MAX_USER)
+					break;
+				if (true == obj->CanSee(clients[id]->GetID(), obj->GetID()))
+					see_monster.emplace_back(obj->GetID());
+			}
+
+			clients[cid]->SetCurHp(clients[cid]->GetCurHp() - m_power * 3);
+
+			bool remove = false;
+			if (clients[cid]->GetCurHp() <= 0) {
+				remove = true;
+				dynamic_cast<CNpc*>(clients[cid])->m_active = false;
+				GainExp(clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2);
+				Send_StatChange_Packet();
+				CreateItem(clients[cid]->GetPosX(), clients[cid]->GetPosY());
+			}
+
+			for (const auto id : see_monster) {
+				dynamic_cast<CPlayer*>(clients[id])->Send_Damage_Packet(cid, 3);
+				if (true == remove)
+					clients[id]->Send_RemoveObject_Packet(cid);
+			}
+		}
+	}
+}
+
+void CPlayer::Skill3()
+{
+	m_ViewLock.lock();
+	auto v_list = m_view_list;
+	m_ViewLock.unlock();
+
+	for (const auto id : v_list) {
+		if (id < MAX_USER)
+			continue;
+		int cid = -1;
+		for (int i = -2; i < 3; ++i) {
+			for (int j = -2; j < 3; ++j) {
+				if (clients[id]->GetPosX() + i == m_PosX && clients[id]->GetPosY() + j == m_PosY) {
+					cid = id;
+					break;
+				}
+			}
+			if (cid != -1)
+				break;
+		}
+		if (-1 != cid) {
+			if (true == m_powerup) {
+				if (chrono::duration_cast<chrono::seconds>(chrono::system_clock::now() - m_poweruptime).count() >= POWERUP_TIME) {
+					m_powerup = false;
+					m_power /= 2;
+				}
+			}
+			vector<int> see_monster;
+			for (auto& obj : clients) {
+				if (CL_STATE::ST_INGAME != obj->GetState())
+					continue;
+				if (obj->GetID() >= MAX_USER)
+					break;
+				if (true == obj->CanSee(clients[id]->GetID(), obj->GetID()))
+					see_monster.emplace_back(obj->GetID());
+			}
+			clients[cid]->SetCurHp(clients[cid]->GetCurHp() - m_power * 3);
+			
+			bool remove = false;
+			if (clients[cid]->GetCurHp() <= 0) {
+				remove = true;
+				dynamic_cast<CNpc*>(clients[cid])->m_active = false;
+				GainExp(clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2);
+				Send_StatChange_Packet();
+				CreateItem(clients[cid]->GetPosX(), clients[cid]->GetPosY());
+			}
+
+			for (const auto id : see_monster) {
+				dynamic_cast<CPlayer*>(clients[id])->Send_Damage_Packet(cid, 3);
+				if (true == remove)
+					clients[id]->Send_RemoveObject_Packet(cid);
+			}
+		}
+	}
+}
+
+void CPlayer::GainExp(int exp)
+{
+	m_exp += exp;
+	if (m_exp >= m_maxExp) {
+		while (true) {
+			m_exp -= m_maxExp;
+			m_level++;
+			m_maxExp = INIT_EXP + (m_level - 1) * EXP_UP;
+
+			if (m_exp < m_maxExp)
+				break;
+		}
+		m_maxHp = m_level * 100;
+		m_curHp = m_maxHp;
+		m_maxMp = m_level * 50;
+		m_curMp = m_maxMp;
+	}
+}
+
+random_device rd;
+default_random_engine dre{ rd() };
+void CPlayer::CreateItem(short x, short y)
+{
+	uniform_int_distribution<> uid;
+	int item = uid(dre) % 100;	//Nothing:20%, Money:50%, Potion:12%/12%, Weapon:2%/2%/2%
+
+	ITEM_TYPE item_type = ITEM_TYPE::NONE;
+
+	if (item <= 49) { // Money
+		item_type = ITEM_TYPE::MONEY;
+	}
+	else if (item >= 50 && item <= 67) { // Nothing
+
+	}
+	else if (item >= 68 && item <= 69) {
+		item_type = ITEM_TYPE::HAT;
+	}
+	else if (item >= 70 && item <= 81) { // HP Potion
+		item_type = ITEM_TYPE::HP_POTION;
+	}
+	else if (item >= 82 && item <= 93) { // MP Potion
+		item_type = ITEM_TYPE::MP_POTION;
+	}
+	else if (item >= 94 && item <= 95) { // Wand
+		item_type = ITEM_TYPE::WAND;
+	}
+	else if (item >= 96 && item <= 97) { // Cloth
+		item_type = ITEM_TYPE::CLOTH;
+	}
+	else {	// ring
+		item_type = ITEM_TYPE::RING;
+	}
+
+	if (ITEM_TYPE::NONE != item_type) {
+		cout << "Generate Item" << endl;
+		SC_ITEM_ADD_PACKET p;
+		p.type = SC_ITEM_ADD;
+		p.size = sizeof(p);
+		p.x = x;
+		p.y = y;
+		p.item_type = static_cast<int>(item_type);
+		itemmap[y][x] = item_type;
+		SendPacket(&p);
+	}
+}
+
+void CPlayer::UseItem(int inven)
+{
+	if (true == m_items[inven]->GetEnable()) {
+		int use = false;
+		switch (m_items[inven]->GetItemType()) {
+		case ITEM_TYPE::HP_POTION:
+			m_curHp -= 10;
+			use = true;
+			break;
+		case ITEM_TYPE::MP_POTION:
+			m_curMp -= 10;
+			use = true;
+			break;
+		default:
+			break;
+		}
+
+		if (true == use) {
+			m_itemLock.lock();
+			m_items[inven]->SetEnable(false);
+			m_items[inven]->SetItemType(ITEM_TYPE::NONE);
+			m_itemLock.unlock();
+			Send_StatChange_Packet();
+			Send_ItemUsed_Packet(inven);
+		}
+	}
 }
 
 void CPlayer::Send_LoginInfo_Packet()
@@ -209,167 +562,18 @@ void CPlayer::Send_Damage_Packet(int cid, int powerlv)
 	p.size = sizeof(p);
 	p.type = SC_DAMAGE;
 	p.id = cid;
-	p.hp = clients[cid]->GetCurHp() - m_power * powerlv;
-	clients[cid]->SetCurHp(p.hp);
+	p.hp = clients[cid]->GetCurHp();
 
 	SendPacket(&p);
 }
 
-void CPlayer::Attack()
+void CPlayer::Send_ItemUsed_Packet(int inven)
 {
-	m_ViewLock.lock();
-	auto v_list = m_view_list;
-	m_ViewLock.unlock();
+	SC_ITEM_USED_PACKET p;
 
-	for (const auto id : v_list) {
-		if (id < MAX_USER)
-			continue;
-		int cid = -1;
-		if (clients[id]->GetPosX() == m_PosX && clients[id]->GetPosY() + 1 == m_PosY) {
-			//아래있는 몬스터
-			cid = id;
-		}
-		else if (clients[id]->GetPosX() == m_PosX && clients[id]->GetPosY() - 1 == m_PosY) {
-			//위에 있는 몬스터
-			cid = id;
-		}
-		else if (clients[id]->GetPosY() == m_PosY && clients[id]->GetPosX() + 1 == m_PosX) {
-			//오른족에 있는 몬스터
-			cid = id;
-		}
-		else if (clients[id]->GetPosY() == m_PosY && clients[id]->GetPosX() - 1 == m_PosX) {
-			//왼쪽에 있는 몬스터
-			cid = id;
-		}
-		if (-1 != cid) {
-			if (true == m_powerup) {
-				if (chrono::duration_cast<chrono::seconds>(chrono::system_clock::now() - m_poweruptime).count() >= POWERUP_TIME) {
-					m_powerup = false;
-					m_power /= 2;
-				}
-			}
+	p.size = sizeof(p);
+	p.type = SC_ITEM_USED;
+	p.inven_num = inven;
 
-			Send_Damage_Packet(cid, 1);
-
-			if (clients[cid]->GetCurHp() <= 0.f) {
-				dynamic_cast<CNpc*>(clients[cid])->m_active = false;
-				Send_RemoveObject_Packet(cid);
-				GainExp(clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2);
-				Send_StatChange_Packet();
-			}
-		}
-	}	
-}
-
-void CPlayer::Skill1()
-{
-	m_poweruptime = chrono::system_clock::now();
-	m_powerup = true;
-}
-
-void CPlayer::Skill2()
-{
-	m_ViewLock.lock();
-	auto v_list = m_view_list;
-	m_ViewLock.unlock();
-
-	for (const auto id : v_list) {
-		if (id < MAX_USER)
-			continue;
-
-		int cid = -1;
-		for (int i = 1; i < 5; ++i) {
-			switch (m_dir) {
-			case DIR::DOWN:
-				if (clients[id]->GetPosX() == m_PosX && clients[id]->GetPosY() - i == m_PosY) {
-					cid = id;
-				}
-				break;
-			case DIR::UP:
-				if (clients[id]->GetPosX() == m_PosX && clients[id]->GetPosY() + i == m_PosY) {
-					cid = id;
-				}
-				break;
-			case DIR::LEFT:
-				if (clients[id]->GetPosX() + i == m_PosX && clients[id]->GetPosY() == m_PosY) {
-					cid = id;
-				}
-				break;
-			case DIR::RIGHT:
-				if (clients[id]->GetPosX() - i == m_PosX && clients[id]->GetPosY() == m_PosY) {
-					cid = id;
-				}
-				break;
-			}
-		}
-		if (-1 != cid) {
-			if (true == m_powerup) {
-				if (chrono::duration_cast<chrono::seconds>(chrono::system_clock::now() - m_poweruptime).count() >= POWERUP_TIME) {
-					m_powerup = false;
-					m_power /= 2;
-				}
-			}
-			Send_Damage_Packet(cid, 3);
-
-			if (clients[cid]->GetCurHp() <= 0) {
-				dynamic_cast<CNpc*>(clients[cid])->m_active = false;
-				Send_RemoveObject_Packet(cid);
-				GainExp(clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2);
-				Send_StatChange_Packet();
-			}
-		}
-	}
-}
-
-void CPlayer::Skill3()
-{
-	m_ViewLock.lock();
-	auto v_list = m_view_list;
-	m_ViewLock.unlock();
-
-	for (const auto id : v_list) {
-		if (id < MAX_USER)
-			continue;
-		int cid = -1;
-		for (int i = -2; i < 3; ++i) {
-			for (int j = -2; j < 3; ++j) {
-				if (clients[id]->GetPosX() + i == m_PosX && clients[id]->GetPosY() + j == m_PosY) {
-					cid = id;
-					break;
-				}
-			}
-			if (cid != -1)
-				break;
-		}
-		if (-1 != cid) {
-			if (true == m_powerup) {
-				if (chrono::duration_cast<chrono::seconds>(chrono::system_clock::now() - m_poweruptime).count() >= POWERUP_TIME) {
-					m_powerup = false;
-					m_power /= 2;
-				}
-			}
-			Send_Damage_Packet(cid, 2);
-
-			if (clients[cid]->GetCurHp() <= 0) {
-				dynamic_cast<CNpc*>(clients[cid])->m_active = false;
-				Send_RemoveObject_Packet(cid);
-				GainExp(clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2);
-				Send_StatChange_Packet();
-			}
-		}
-	}
-}
-
-void CPlayer::GainExp(int exp)
-{
-	m_exp += exp;
-	if (m_exp >= m_maxExp) {
-		m_exp -= m_maxExp;
-		m_level++;
-		m_maxExp = INIT_EXP + (m_level-1) * EXP_UP;
-		m_maxHp = m_level * 100;
-		m_curHp = m_maxHp;
-		m_maxMp = m_level * 50;
-		m_curMp = m_maxMp;
-	}
+	SendPacket(&p);
 }

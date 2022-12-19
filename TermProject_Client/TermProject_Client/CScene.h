@@ -7,6 +7,7 @@
 #define POWERUP_TIME 10.f
 
 class CObject;
+class CItem;
 class CPlayer;
 class CMoveObject;
 class CEffect;
@@ -70,6 +71,9 @@ public:
 	void ProcessChatPacket(char* ptr);
 	void ProcessDamagePacket(char* ptr);
 	void ProcessStatChangePacket(char* ptr);
+	void ProcessItemAddPacket(char* ptr);
+	void ProcessItemGetPacket(char* ptr);
+	void ProcessItemUsedPacket(char* ptr);
 
 	void ChangeAvartarTex(int x, int y, int x2, int y2);
 	void SetSkillOnOff(int skill, bool type);
@@ -90,6 +94,8 @@ private:
 	CPlayer* m_avatar;
 	CMoveObject** m_objects;
 	array<CEffect*, 4> m_effects;
+	vector<CItem*> m_itemVector;
+	array<CItem*, 6> m_inventory;
 
 	unique_ptr<CUserInterface> m_interface;	
 

@@ -111,6 +111,22 @@ void CFramework::Process()
 						m_scene->SetEffectEnable(3, true);
 					}
 					break;
+				case sf::Keyboard::Num1:
+				case sf::Keyboard::Num2:
+				case sf::Keyboard::Num3:
+				case sf::Keyboard::Num4:
+				case sf::Keyboard::Num5:
+				case sf::Keyboard::Num6:
+				{
+					cout << "USE_ITEM " << event.key.code - 27 << endl;
+					CS_USE_ITEM_PACKET p;
+					p.size = sizeof(p);
+					p.type = CS_USE_ITEM;
+					p.inven = event.key.code - 27;
+					m_packetMgr->SendPacket(&p);
+					break;
+				}
+
 				}
 				if (-1 != direction) {
 					CS_MOVE_PACKET p;

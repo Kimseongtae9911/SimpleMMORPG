@@ -255,7 +255,7 @@ CScene::CScene()
 
 	m_mapTile->loadFromFile("Resource/MapTiles.png");
 	m_character->loadFromFile("Resource/Character.png");
-	m_items->loadFromFile("Resource/Item.png");
+	m_items->loadFromFile("Resource/Items.png");
 	m_skills->loadFromFile("Resource/Skill.png");
 	m_enemy[0]->loadFromFile("Resource/Enemy.png");
 
@@ -312,7 +312,13 @@ CScene::CScene()
 	m_effects[0] = new CAttackEffect("Resource/AttackEffect.png", 0.25f, 3);
 	m_effects[1] = new CSkillEffect1("Resource/SkillEffect1.png", 0.25f, 7);
 	m_effects[2] = new CSkillEffect2("Resource/SkillEffect2.png", 0.1f, 12);
-	m_effects[3] = new CSkillEffect3("Resource/SkillEffect3.png", 0.1f, 10);	
+	m_effects[3] = new CSkillEffect3("Resource/SkillEffect3.png", 0.1f, 10);
+
+	m_itemVector = {};
+
+	for (int i = 0; i < m_inventory.size(); ++i) {
+		m_inventory[i] = new CItem();
+	}
 }
 
 CScene::~CScene()
@@ -396,6 +402,18 @@ void CScene::Render(sf::RenderWindow& RW)
 
 	m_interface->Render(RW);
 
+	for (const auto& item : m_itemVector) {
+		if (item->InScreen(m_avatar->m_x, m_avatar->m_y)) {
+			item->Render(RW, m_left, m_top);
+		}
+	}
+
+	for (int i = 0; i < m_inventory.size(); ++i) {
+		if (m_inventory[i]) {
+			m_inventory[i]->a_draw(RW);
+		}
+	}
+
 	for (int i = 0; i < m_effects.size(); ++i) {
 		if (m_effects[i]) {
 			if (m_effects[i]->GetEnable())
@@ -410,8 +428,8 @@ void CScene::ProcessLoginInfoPacket(char* ptr)
 	m_id = packet->id;
 	m_avatar->m_id = m_id;
 	m_avatar->move(packet->x, packet->y);
-	m_left = packet->x - 8;
-	m_top = packet->y - 8;
+	m_left = packet->x - 10;
+	m_top = packet->y - 9;
 	m_avatar->set_name(packet->name);
 	m_avatar->SetCurHp(packet->hp);
 	m_avatar->SetMaxHp(packet->max_hp);
@@ -432,8 +450,8 @@ void CScene::ProcessAddObjectPacket(char* ptr)
 
 	if (id == m_id) {
 		m_avatar->move(packet->x, packet->y);
-		m_left = packet->x - 8;
-		m_top = packet->y - 8;
+		m_left = packet->x - 10;
+		m_top = packet->y - 9;
 		m_avatar->show();
 	}
 	else if (id < MAX_USER) {
@@ -465,8 +483,8 @@ void CScene::ProcessMoveObjectPacket(char* ptr)
 	int other_id = packet->id;
 	if (other_id == m_id) {
 		m_avatar->move(packet->x, packet->y);
-		m_left = packet->x - 8;
-		m_top = packet->y - 8;
+		m_left = packet->x - 10;
+		m_top = packet->y - 9;
 		/*g_left_x = packet->x - SCREEN_WIDTH / 2;
 		g_top_y = packet->y - SCREEN_HEIGHT / 2;*/
 	}
@@ -530,6 +548,34 @@ void CScene::ProcessStatChangePacket(char* ptr)
 	m_interface->UpdateHp(p->max_hp, p->hp);
 	m_interface->UpdateMp(p->max_mp, p->mp);
 	m_interface->UpdateExp(INIT_EXP + (p->level-1) * EXP_UP, p->exp);
+}
+
+void CScene::ProcessItemAddPacket(char* ptr)
+{
+	SC_ITEM_ADD_PACKET* p = reinterpret_cast<SC_ITEM_ADD_PACKET*>(ptr);
+	CItem* item = new CItem(*m_items, static_cast<ITEM_TYPE>(p->item_type), p->x, p->y);
+	m_itemVector.emplace_back(item);
+}
+
+void CScene::ProcessItemGetPacket(char* ptr)
+{
+	SC_ITEM_GET_PACKET* p = reinterpret_cast<SC_ITEM_GET_PACKET*>(ptr);
+	for (int i = 0; i < m_itemVector.size(); ++i) {
+		if (m_itemVector[i]->m_x == p->x && m_itemVector[i]->m_y == p->y) {
+			m_itemVector[i]->a_move(WINDOW_WIDTH + 25.f + (p->inven_num % 3) * TILE_WIDTH + (p->inven_num % 3 + 1) * 3.f, 270.f + (p->inven_num / 3) * TILE_WIDTH + (p->inven_num / 3 + 1) * 3.f);
+			m_inventory[p->inven_num] = m_itemVector[i];
+			m_itemVector.erase(m_itemVector.begin() + i);
+			break;
+		}
+	}
+}
+
+void CScene::ProcessItemUsedPacket(char* ptr)
+{
+	SC_ITEM_USED_PACKET* p = reinterpret_cast<SC_ITEM_USED_PACKET*>(ptr);
+	CItem* temp =  m_inventory[p->inven_num];
+	m_inventory[p->inven_num] = new CItem();
+	delete temp;
 }
 
 void CScene::ChangeAvartarTex(int x, int y, int x2, int y2)

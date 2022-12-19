@@ -30,6 +30,21 @@ public:
 	void ChangeTex(int x, int y, int x2, int y2) { m_sprite.setTextureRect({ x, y, x2, y2 }); }
 };
 
+class CItem : public CObject
+{
+public:
+	CItem();
+	CItem(sf::Texture& t, ITEM_TYPE type, short x, short y);
+	virtual ~CItem();
+
+	const bool InScreen(int playerx, int playery) const;
+
+	void Render(sf::RenderWindow& RW, int left, int top);	
+
+private:
+	ITEM_TYPE m_itemType;
+};
+
 class CMoveObject : public CObject
 {
 public:

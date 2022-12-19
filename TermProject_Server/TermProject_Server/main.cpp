@@ -105,6 +105,7 @@ void process_packet(int c_id, char* packet)
 			}
 			}
 			clients[c_id]->SetPos(x, y);
+			dynamic_cast<CPlayer*>(clients[c_id])->CheckItem();
 
 			unordered_set<int> near_list;
 			clients[c_id]->m_ViewLock.lock();
@@ -144,7 +145,7 @@ void process_packet(int c_id, char* packet)
 				if (0 == near_list.count(pl)) {
 					clients[c_id]->Send_RemoveObject_Packet(pl);
 					if (pl < MAX_USER)
-						clients[c_id]->Send_RemoveObject_Packet(c_id);
+						clients[pl]->Send_RemoveObject_Packet(c_id);
 				}
 			}
 			break;
@@ -179,6 +180,12 @@ void process_packet(int c_id, char* packet)
 		}
 		break;
 	}
+	case CS_USE_ITEM:
+	{
+		CS_USE_ITEM_PACKET* p = reinterpret_cast<CS_USE_ITEM_PACKET*>(packet);
+		dynamic_cast<CPlayer*>(clients[c_id])->UseItem(p->inven);
+		break;
+	}
 	}
 }
 
@@ -209,6 +216,8 @@ void disconnect(int c_id)
 void do_npc_random_move(int npc_id)
 {
 	CObject* npc = clients[npc_id];
+
+	// 해당 NPC가 시야에 있는 플레이어들
 	unordered_set<int> old_vl;
 	for (auto& obj : clients) {
 		if (CL_STATE::ST_INGAME != obj->GetState()) 
@@ -231,19 +240,21 @@ void do_npc_random_move(int npc_id)
 		}
 		npc->SetPos(x, y);
 	}
+
+	// 움직인 이후에 해당 NPC가 시야에 있는 플레이어들
 	unordered_set<int> new_vl;
 	for (auto& obj : clients) {
 		if (CL_STATE::ST_INGAME != obj->GetState()) 
 			continue;
 		if (obj->GetID() >= MAX_USER) 
 			continue;
-		if (true == Can_See(npc->GetID(), npc->GetID()))
+		if (true == Can_See(npc->GetID(), obj->GetID()))
 			new_vl.insert(obj->GetID());
 	}
 
 	for (auto pl : new_vl) {
+		// new_vl에는 있는데 old_vl에는 없을 때 플레이어의 시야에 등장
 		if (0 == old_vl.count(pl)) {
-			// 플레이어의 시야에 등장
 			clients[pl]->Send_AddObject_Packet(npc->GetID());
 		}
 		else {
@@ -388,7 +399,7 @@ void worker_thread(HANDLE h_iocp)
 			}
 			delete ex_over;
 		}
-								 break;
+			break;
 		case OP_TYPE::OP_AI_HELLO:
 			dynamic_cast<CNpc*>(clients[key])->LuaLock.lock();
 			lua_getglobal(dynamic_cast<CNpc*>(clients[key])->GetLua(), "event_player_move");
@@ -434,16 +445,6 @@ void InitializeData()
 	g_DB = new CDatabase();
 	g_DB->Initialize();
 
-	for (int i = 0; i < MAX_USER; ++i) {
-		clients[i] = new CPlayer();
-	}
-	cout << "Initialize NPC Start" << endl;
-	for (int i = MAX_USER; i < MAX_USER + MAX_NPC; ++i) {
-		//clients[i] = new CPlayer();
-		clients[i] = new CNpc(i);
-	}
-	cout << "Initialize NPC Complete" << endl;
-
 	cout << "Uploading Map Data" << endl;
 	fstream in("Data/Map.txt");
 	for (int i = 0; i < 100; ++i) {
@@ -460,7 +461,6 @@ void InitializeData()
 			}
 		}
 	}
-
 	for (int k = 100; k < W_HEIGHT; ++k) {
 		for (int i = 0; i < 20; ++i) {
 			for (int j = 0; j < 100; ++j) {
@@ -469,6 +469,19 @@ void InitializeData()
 		}
 	}
 	cout << "Map Upload Complete" << endl;
+
+	for (int i = 0; i < MAX_USER; ++i) {
+		clients[i] = new CPlayer();
+	}
+	cout << "Initialize NPC Start" << endl;
+	for (int i = MAX_USER; i < MAX_USER + MAX_NPC; ++i) {
+		//clients[i] = new CPlayer();
+		clients[i] = new CNpc(i);
+		lua_getglobal(dynamic_cast<CNpc*>(clients[i])->GetLua(), "monster_initialize");
+		lua_pushnumber(dynamic_cast<CNpc*>(clients[i])->GetLua(), dynamic_cast<CNpc*>(clients[i])->GetID());
+		lua_pcall(dynamic_cast<CNpc*>(clients[i])->GetLua(), 1, 0, 0);
+	}
+	cout << "Initialize NPC Complete" << endl;
 }
 
 int Get_NewID()

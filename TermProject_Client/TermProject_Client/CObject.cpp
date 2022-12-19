@@ -107,3 +107,65 @@ void CNpc::UpdateHPBar()
 		hide();
 	}
 }
+
+CItem::CItem()
+{
+}
+
+CItem::CItem(sf::Texture& t, ITEM_TYPE type, short x, short y)
+{
+	m_itemType = type;
+	m_x = x;
+	m_y = y;
+	switch (type) {
+	case ITEM_TYPE::MONEY:
+		m_sprite.setTexture(t);
+		m_sprite.setTextureRect(sf::IntRect(64, 0, TILE_WIDTH, TILE_WIDTH));
+		break;
+	case ITEM_TYPE::HP_POTION:
+		m_sprite.setTexture(t);
+		m_sprite.setTextureRect(sf::IntRect(32 * 6, 0, TILE_WIDTH, TILE_WIDTH));
+		break;
+	case ITEM_TYPE::MP_POTION:
+		m_sprite.setTexture(t);
+		m_sprite.setTextureRect(sf::IntRect(32 * 5, 0, TILE_WIDTH, TILE_WIDTH));
+		break;
+	case ITEM_TYPE::WAND:
+		m_sprite.setTexture(t);
+		m_sprite.setTextureRect(sf::IntRect(32 * 4, 0, TILE_WIDTH, TILE_WIDTH));
+		break;
+	case ITEM_TYPE::CLOTH:
+		m_sprite.setTexture(t);
+		m_sprite.setTextureRect(sf::IntRect(0, 0, TILE_WIDTH, TILE_WIDTH));
+		break;
+	case ITEM_TYPE::RING:
+		m_sprite.setTexture(t);
+		m_sprite.setTextureRect(sf::IntRect(32, 0, TILE_WIDTH, TILE_WIDTH));
+		break;
+	case ITEM_TYPE::HAT:
+		m_sprite.setTexture(t);
+		m_sprite.setTextureRect(sf::IntRect(32 * 3, 0, TILE_WIDTH, TILE_WIDTH));
+		break;
+	}
+}
+
+CItem::~CItem()
+{
+}
+
+const bool CItem::InScreen(int playerx, int playery) const
+{
+	if (playerx - m_x <= 10 && playerx - m_x >= -9 &&
+		playery - m_y >= -9 && playery - m_y <= 10) {
+		return true;
+	}
+	return false;
+}
+
+void CItem::Render(sf::RenderWindow& RW, int left, int top)
+{
+	float rx = (m_x - left) * 32.f + 8;
+	float ry = (m_y - top) * 32.f + 8;
+	m_sprite.setPosition(rx, ry);
+	RW.draw(m_sprite);
+}

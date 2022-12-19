@@ -1,6 +1,7 @@
 myid = 99999;
-function set_uid(x)
+function monster_initialize(x)
 	myid = x;
+	API_Initialize(myid);
 end
 
 function event_player_move(player)

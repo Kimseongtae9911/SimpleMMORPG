@@ -148,6 +148,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="CDatabase.h" />
+    <ClInclude Include="CItem.h" />
     <ClInclude Include="CObject.h" />
     <ClInclude Include="LuaFunc.h" />
     <ClInclude Include="pch.h" />
@@ -155,6 +156,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CDatabase.cpp" />
+    <ClCompile Include="CItem.cpp" />
     <ClCompile Include="CObject.cpp" />
     <ClCompile Include="LuaFunc.cpp" />
     <ClCompile Include="main.cpp" />

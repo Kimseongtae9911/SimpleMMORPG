@@ -6,6 +6,8 @@
 #define SKILL3_COOL 7.f
 #define POWERUP_TIME 10.f
 
+class CItem;
+
 class OVER_EXP {
 public:
 	WSAOVERLAPPED m_over;
@@ -52,6 +54,7 @@ public:
 	void SetLevel(int level) { m_level = level; }
 	void SetMaxHp(int maxhp) { m_maxHp = maxhp; }
 	void SetCurHp(int curhp) { m_curHp = curhp; }
+	void SetPower(int power) { m_power = power; }
 
 	const CL_STATE GetState() const { return m_State; }
 	const int GetRemainBuf() const { return m_RemainBuf_Size; }
@@ -62,9 +65,12 @@ public:
 	const int GetCurHp() const { return m_curHp; }
 	const int GetID() const { return m_ID; }
 	const char* GetName() const { return m_Name; }
+	const int GetPower() const { return m_power; }
 
 	const unordered_set<int>& GetViewList() const {return m_view_list; }
 	const SOCKET& GetSocket() const { return m_Socket; }
+
+	const bool CanSee(int from, int to) const;
 
 public:
 	mutex m_StateLock;
@@ -86,6 +92,7 @@ protected:
 	int m_level;
 	int m_maxHp;
 	int m_curHp;
+	int m_power;
 
 private:
 	OVER_EXP m_RecvOver;
@@ -97,7 +104,11 @@ public:
 	CNpc(int id);
 	virtual ~CNpc();
 
+	void SetMonType(MONSTER_TYPE type) { m_monType = type; }
+	void SetRespawnPos(short x, short y) { m_respawnX = x; m_respawnY = y; }
+
 	lua_State* GetLua() { return m_L; }
+	const MONSTER_TYPE GetMonType() const { return m_monType; }
 
 public:
 	atomic_bool	m_active;
@@ -105,6 +116,8 @@ public:
 
 private:	
 	lua_State* m_L;	
+	MONSTER_TYPE m_monType;
+	short m_respawnX, m_respawnY;
 };
 
 class CPlayer : public CObject
@@ -119,25 +132,30 @@ public:
 	void SetMp(const int mp) { m_curMp = mp; }
 	void SetUsedTime(const int index, const chrono::system_clock::time_point time) { m_usedTime[index] = time; }
 	void SetDir(DIR dir) { m_dir = dir; }
-	void SetPower(int power) { m_power = power; }
 	void SetPowerUp(bool power) { m_powerup = power; }
 
 	const int GetExp() const { return m_exp; }
 	const int GetMp() const { return m_curMp; }
-	const int GetPower() const { return m_power; }
 	const bool GetPowerUp() const { return m_powerup; }
 	const chrono::system_clock::time_point GetUsedTime(const int index) const { return m_usedTime[index]; }
 
 	void PlayerAccept(int id, SOCKET sock);
+	void CheckItem();
 	void Send_LoginInfo_Packet();
 	void Send_StatChange_Packet();
 	void Send_Damage_Packet(int cid, int powerlv);
+	void Send_ItemUsed_Packet(int inven);
 
 	void Attack();
 	void Skill1();
 	void Skill2();
 	void Skill3();
 	void GainExp(int exp);
+	void CreateItem(short x, short y);
+	void UseItem(int inven);
+
+public:
+	mutex m_itemLock;
 
 private:
 	chrono::system_clock::time_point m_poweruptime;
@@ -147,7 +165,7 @@ private:
 	int m_exp;
 	int m_maxMp;
 	int m_curMp;
-	int m_power;
 	DIR m_dir;
 	array<chrono::system_clock::time_point, 4> m_usedTime;
+	array<CItem*, 6> m_items;
 };

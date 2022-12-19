@@ -1,12 +1,13 @@
 #pragma once
 #include <iostream>
-#include <array>
 #include <fstream>
+#include <random>
 #include <WS2tcpip.h>
 #include <MSWSock.h>
 #include <thread>
-#include <vector>
 #include <mutex>
+#include <array>
+#include <vector>
 #include <unordered_set>
 #include <concurrent_priority_queue.h>
 #include "protocol.h"
@@ -32,6 +33,10 @@ enum class DIR {LEFT, RIGHT, UP, DOWN};
 enum class OP_TYPE { OP_ACCEPT, OP_RECV, OP_SEND, OP_NPC_MOVE, OP_AI_HELLO };
 
 enum class CL_STATE {ST_FREE, ST_ALLOC, ST_INGAME};
+
+enum ITEM_TYPE {NONE, MONEY, HP_POTION, MP_POTION, WAND, CLOTH, RING, HAT};
+
+enum MONSTER_TYPE {};
 
 enum EVENT_TYPE { EV_RANDOM_MOVE };
 
