@@ -10,6 +10,7 @@
 #include <vector>
 #include <unordered_set>
 #include <set>
+#include <queue>
 #include <stack>
 #include <concurrent_priority_queue.h>
 #include "protocol.h"
@@ -34,7 +35,7 @@ constexpr int INF = 2140000000;
 
 enum class DIR {LEFT, RIGHT, UP, DOWN};
 
-enum class OP_TYPE { OP_ACCEPT, OP_RECV, OP_SEND, OP_NPC_MOVE, OP_AI_HELLO, OP_PLAYER_HEAL };
+enum class OP_TYPE { OP_ACCEPT, OP_RECV, OP_SEND, OP_NPC_MOVE, OP_PLAYER_HEAL, OP_MONSTER_RESPAWN };
 
 enum class CL_STATE {ST_FREE, ST_ALLOC, ST_INGAME};
 
@@ -42,7 +43,7 @@ enum ITEM_TYPE { NONE, MONEY, HP_POTION, MP_POTION, WAND, CLOTH, RING, HAT };
 
 enum MONSTER_TYPE { AGRO, PEACE };
 
-enum EVENT_TYPE { EV_RANDOM_MOVE, EV_CHASE_PLAYER, EV_ATTACK_PLAYER, EV_PLAYER_HEAL };
+enum EVENT_TYPE { EV_RANDOM_MOVE, EV_CHASE_PLAYER, EV_ATTACK_PLAYER, EV_PLAYER_HEAL, EV_MONSTER_RESPAWN };
 
 struct TIMER_EVENT {
 	int obj_id;
@@ -62,7 +63,7 @@ struct WeightPos {
 
 	constexpr bool operator < (const WeightPos& R) const
 	{
-		return (weight < R.weight);
+		return (weight > R.weight);
 	}
 };
 

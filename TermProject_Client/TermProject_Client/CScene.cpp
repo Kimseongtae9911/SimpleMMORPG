@@ -418,11 +418,23 @@ void CScene::Render(sf::RenderWindow& RW)
 			m_inventory[i]->a_draw(RW);
 		}
 	}
+	if (true == m_moneyEnable) {
+		RW.draw(m_moneyText);
+	}
 
 	for (int i = 0; i < m_effects.size(); ++i) {
 		if (m_effects[i]) {
 			if (m_effects[i]->GetEnable())
 				m_effects[i]->Render(RW, m_avatar->m_x, m_avatar->m_y, m_left, m_top, m_avatar->GetDir());
+		}
+	}
+
+	for (int i = 0; i < m_chatEnable.size(); ++i) {
+		if (m_chatEnable[i] == true)
+			RW.draw(m_chat[i]);
+
+		if (chrono::system_clock::now() > m_chatTime[i]) {
+			m_chatEnable[i] = false;
 		}
 	}
 }
@@ -478,6 +490,8 @@ void CScene::ProcessAddObjectPacket(char* ptr)
 		m_objects[id]->SetMaxHp(packet->max_hp);
 		m_objects[id]->SetLevel(packet->level);
 
+		dynamic_cast<CNpc*>(m_objects[id])->UpdateHPBar();
+
 		m_objects[id]->show();
 	}
 }
@@ -529,13 +543,7 @@ void CScene::ProcessRemoveObjectPacket(char* ptr)
 void CScene::ProcessChatPacket(char* ptr)
 {
 	SC_CHAT_PACKET* packet = reinterpret_cast<SC_CHAT_PACKET*>(ptr);
-	int other_id = packet->id;
-	if (other_id == m_id) {
-		m_avatar->set_chat(packet->mess);
-	}
-	else {
-		m_objects[other_id]->set_chat(packet->mess);
-	}
+	SetChat(packet->mess);
 }
 
 void CScene::ProcessDamagePacket(char* ptr)
@@ -565,11 +573,21 @@ void CScene::ProcessItemAddPacket(char* ptr)
 void CScene::ProcessItemGetPacket(char* ptr)
 {
 	SC_ITEM_GET_PACKET* p = reinterpret_cast<SC_ITEM_GET_PACKET*>(ptr);
+	
 	for (int i = 0; i < m_itemVector.size(); ++i) {
 		if (m_itemVector[i]->m_x == p->x && m_itemVector[i]->m_y == p->y) {
 			m_itemVector[i]->a_move(WINDOW_WIDTH + 25.f + (p->inven_num % 3) * TILE_WIDTH + (p->inven_num % 3 + 1) * 3.f, 270.f + (p->inven_num / 3) * TILE_WIDTH + (p->inven_num / 3 + 1) * 3.f);
 			m_inventory[p->inven_num] = m_itemVector[i];
 			m_itemVector.erase(m_itemVector.begin() + i);
+			if (p->item_type == ITEM_TYPE::MONEY) {
+				m_moneyEnable = true;
+				m_money += 1;
+				m_moneyText.setString(to_string(m_money));
+				m_moneyText.setCharacterSize(10);
+				m_moneyText.setFont(g_font);
+				m_moneyText.setFillColor(sf::Color(255, 255, 255));
+				m_moneyText.setPosition(sf::Vector2f(WINDOW_WIDTH + 25.f + (p->inven_num % 3) * TILE_WIDTH + (p->inven_num % 3 + 1) * 3.f + 1, 270.f + (p->inven_num / 3) * TILE_WIDTH + (p->inven_num / 3 + 1) * 3.f + 1));
+			}
 			break;
 		}
 	}
@@ -615,4 +633,39 @@ void CScene::SetDir(DIR dir)
 const bool CScene::GetEffectEnable(int index) const
 {
 	return m_effects[index]->GetEnable();
+}
+
+void CScene::SetChat(const char chat[])
+{
+	int index = -1;
+	for (int i = 0; i < m_chatEnable.size(); ++i) {
+		if (m_chatEnable[i] == false) {
+			index = i;
+			m_chatEnable[i] = true;
+			break;
+		}
+	}
+	if (index == -1) {
+		for (int i = 0; i < m_chatEnable.size(); ++i) {
+			m_chatEnable[i] = false;
+		}
+		m_chat[0].setFont(g_font);
+		m_chat[0].setString(chat);
+		m_chat[0].setFillColor(sf::Color(255, 255, 255));
+		m_chat[0].setStyle(sf::Text::Bold);
+		m_chatTime[0] = chrono::system_clock::now() + chrono::seconds(3);
+		m_chat[0].setCharacterSize(15);
+		m_chat[0].setPosition(5, WINDOW_HEIGHT - 30);
+		m_chatTime[0] = chrono::system_clock::now() + 5s;
+	}
+	else {
+		m_chat[index].setFont(g_font);
+		m_chat[index].setString(chat);
+		m_chat[index].setFillColor(sf::Color(255, 255, 255));
+		m_chat[index].setStyle(sf::Text::Bold);
+		m_chatTime[index] = chrono::system_clock::now() + chrono::seconds(3);
+		m_chat[index].setCharacterSize(15);
+		m_chat[index].setPosition(5, WINDOW_HEIGHT - 30 - (m_chat[0].getCharacterSize() + 3) * index);
+		m_chatTime[index] = chrono::system_clock::now() + 5s;
+	}
 }

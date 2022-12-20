@@ -83,7 +83,7 @@ public:
 	const chrono::system_clock::time_point GetCoolTime(int index) const { return m_cooltime[index]; }
 	const bool GetEffectEnable(int index) const;
 	void SetCoolTime(int index, chrono::system_clock::time_point time) { m_cooltime[index] = time; }
-	
+	void SetChat(const char chat[]);
 
 private:
 	int m_left;
@@ -114,4 +114,12 @@ private:
 	CObject* m_lake_tile;
 
 	char m_tilemap[W_HEIGHT][W_WIDTH];
+
+	int m_money = 0;
+	sf::Text m_moneyText;
+	bool m_moneyEnable = false;
+
+	array<sf::Text, 5> m_chat;
+	array<bool, 5> m_chatEnable = {false, false, false, false, false};
+	array<chrono::system_clock::time_point, 5> m_chatTime = {};
 };

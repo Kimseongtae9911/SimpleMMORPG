@@ -73,7 +73,7 @@ struct CS_ATTACK_PACKET {
 
 struct CS_USE_ITEM_PACKET {
 	unsigned char size;
-	char type;	
+	char type;
 	int inven;
 };
 

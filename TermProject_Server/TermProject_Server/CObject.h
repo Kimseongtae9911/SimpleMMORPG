@@ -108,11 +108,15 @@ public:
 	void SetRespawnPos(short x, short y) { m_respawnX = x; m_respawnY = y; }
 	void SetChase(bool chase) { m_chase = chase; }
 	void SetTarget(int target) { m_target = target; }
+	void SetDie(bool die) { m_die = die; }
 
 	lua_State* GetLua() { return m_L; }
 	const MONSTER_TYPE GetMonType() const { return m_monType; }
 	const bool GetChase() const { return m_chase; }
 	const int GetTarget() const { return m_target; }
+	const bool GetDie() const { return m_die; }
+	const short GetRespawnX() const { return m_respawnX; }
+	const short GetRespawnY() const { return m_respawnY; }
 
 public:
 	atomic_bool	m_active;
@@ -123,6 +127,7 @@ private:
 	MONSTER_TYPE m_monType;
 	short m_respawnX, m_respawnY;
 
+	bool m_die = false;
 	bool m_chase;
 	int m_target;
 };
@@ -143,6 +148,7 @@ public:
 
 	const int GetExp() const { return m_exp; }
 	const int GetMp() const { return m_curMp; }
+	const int GetMaxMp() const { return m_maxMp; }
 	const bool GetPowerUp() const { return m_powerup; }
 	const chrono::system_clock::time_point GetUsedTime(const int index) const { return m_usedTime[index]; }
 

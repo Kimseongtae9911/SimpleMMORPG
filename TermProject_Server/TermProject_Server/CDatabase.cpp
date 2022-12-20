@@ -37,7 +37,7 @@ bool CDatabase::Initialize()
 
 				// Allocate statement handle  
 				if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
-					cout << "ODBC Connected\n";
+					cout << "DB Connected\n";
 					retcode = SQLAllocHandle(SQL_HANDLE_STMT, m_hdbc, &m_hstmt);
 				}
 
@@ -102,6 +102,8 @@ char* CDatabase::GetPlayerInfo(string name)
                 user_info->cur_hp = -1;
                 user_info->max_mp = -1;
                 user_info->cur_mp = -1;
+                SQLCloseCursor(m_hstmt);
+                SQLFreeStmt(m_hstmt, SQL_UNBIND);
             }
         }
 
@@ -119,6 +121,39 @@ char* CDatabase::GetPlayerInfo(string name)
 
 void CDatabase::SavePlayerInfo(int id, int x, int y)
 {
+}
+
+void CDatabase::MakeNewInfo(char* name)
+{
+    string s(name);
+    //string temp = "EXEC make_new_info @Param = " + s;
+    string temp = "EXEC get_user_data " + s;
+    
+    wstring sql;
+    sql.assign(temp.cbegin(), temp.cend());
+    
+    SQLRETURN retcode = SQLExecDirect(m_hstmt, (SQLWCHAR*)sql.c_str(), SQL_NTS);
+    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+
+        retcode = SQLFetch(m_hstmt);
+        if (retcode == SQL_ERROR || retcode == SQL_SUCCESS_WITH_INFO)
+            Show_Error(m_hstmt, SQL_HANDLE_STMT, retcode);
+        if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO || retcode == SQL_NO_DATA)
+        {
+            cout << "Made New User Data" << endl;
+        }
+        else {
+            cout << "Failed to make new Data" << endl;
+        }
+
+    }
+    else
+        Show_Error(m_hstmt, SQL_HANDLE_STMT, retcode);
+
+    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+        SQLCloseCursor(m_hstmt);
+        SQLFreeStmt(m_hstmt, SQL_UNBIND);
+    }
 }
 
 void CDatabase::Show_Error(SQLHANDLE hHandle, SQLSMALLINT hType, RETCODE RetCode)

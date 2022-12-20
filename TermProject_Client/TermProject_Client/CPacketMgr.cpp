@@ -74,10 +74,11 @@ void CPacketMgr::ProcessPacket(char* ptr)
 	switch (ptr[1])
 	{
 	case SC_LOGIN_INFO:
-		cout << "LoginInfo Packet" << endl;
 		m_scene->ProcessLoginInfoPacket(ptr);
 		break;
 	case SC_LOGIN_FAIL:
+		cout << "Already Playing" << endl;
+		exit(0);
 		break;
 	case SC_ADD_OBJECT:
 		m_scene->ProcessAddObjectPacket(ptr);
@@ -104,7 +105,6 @@ void CPacketMgr::ProcessPacket(char* ptr)
 		m_scene->ProcessItemGetPacket(ptr);
 		break;
 	case SC_ITEM_USED:
-		cout << "Item Used" << endl;
 		m_scene->ProcessItemUsedPacket(ptr);
 		break;
 	default:

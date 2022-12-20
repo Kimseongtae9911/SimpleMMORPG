@@ -18,7 +18,7 @@ public:
 private:
 	ITEM_TYPE m_itemType;
 	bool m_enable;
-	int m_num;
+	int m_num = 0;
 	chrono::system_clock::time_point m_createTime;
 };
 

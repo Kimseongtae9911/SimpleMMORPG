@@ -5,6 +5,7 @@
 
 extern HANDLE h_iocp;
 extern array<CObject*, MAX_USER + MAX_NPC> clients;
+extern concurrency::concurrent_priority_queue<TIMER_EVENT> timer_queue;
 
 ITEM_TYPE itemmap[W_HEIGHT][W_WIDTH] = { NONE, };
 
@@ -125,7 +126,7 @@ const bool CObject::CanSee(int from, int to) const
 CNpc::CNpc(int id)
 {
 	m_ID = id;
-	sprintf_s(m_Name, "NPC%d", id);
+	sprintf_s(m_Name, "MONSTER%d", id);
 	m_State = CL_STATE::ST_INGAME;
 
 	auto L = m_L = luaL_newstate();
@@ -213,6 +214,8 @@ void CPlayer::CheckItem()
 		}
 
 		if (-1 != index) {
+			char msg[CHAT_SIZE];
+			char item[11];
 			SC_ITEM_GET_PACKET p;
 			p.size = sizeof(p);
 			p.type = SC_ITEM_GET;
@@ -221,6 +224,33 @@ void CPlayer::CheckItem()
 			p.x = m_PosX;
 			p.y = m_PosY;
 			SendPacket(&p);
+
+			switch (p.item_type) {
+			case ITEM_TYPE::CLOTH:
+				memcpy(item, "CLOTH", 10);
+				break;
+			case ITEM_TYPE::HAT:
+				memcpy(item, "HAT", 10);
+				break;
+			case ITEM_TYPE::HP_POTION:
+				memcpy(item, "HP_POTION", 10);
+				break;
+			case ITEM_TYPE::MONEY:
+				memcpy(item, "MONEY", 10);
+				break;
+			case ITEM_TYPE::MP_POTION:
+				memcpy(item, "MP_POTION", 10);
+				break;
+			case ITEM_TYPE::RING:
+				memcpy(item, "RING", 10);
+				break;
+			case ITEM_TYPE::WAND:
+				memcpy(item, "WAND", 10);
+				break;
+			}
+
+			sprintf_s(msg, CHAT_SIZE, "%s Obtained", item);
+			Send_Chat_Packet(m_ID, msg);
 		}
 		itemmap[m_PosY][m_PosX] = ITEM_TYPE::NONE;
 	}
@@ -270,13 +300,15 @@ void CPlayer::Attack()
 					see_monster.emplace_back(obj->GetID());
 			}
 
-			clients[cid]->SetCurHp(clients[cid]->GetCurHp() - m_power * 3);
+			clients[cid]->SetCurHp(clients[cid]->GetCurHp() - m_power * 2);
 
 			bool remove = false;
+			int exp = 0;
 			if (clients[cid]->GetCurHp() <= 0.f) {
 				remove = true;
-				dynamic_cast<CNpc*>(clients[cid])->m_active = false;
-				int exp = clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2;
+				dynamic_cast<CNpc*>(clients[cid])->SetDie(true);
+				timer_queue.push({cid, chrono::system_clock::now() + 30s, EV_MONSTER_RESPAWN, 0});
+				exp = clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2;
 				if (dynamic_cast<CNpc*>(clients[cid])->GetMonType() == MONSTER_TYPE::AGRO)
 					exp *= 2;
 				GainExp(exp);
@@ -286,8 +318,29 @@ void CPlayer::Attack()
 
 			for (const auto id : see_monster) {
 				dynamic_cast<CPlayer*>(clients[id])->Send_Damage_Packet(cid, 3);
-				if (true == remove)
+				if (true == remove) {
 					clients[id]->Send_RemoveObject_Packet(cid);
+					char msg[CHAT_SIZE];
+					if (id == m_ID) {
+						sprintf_s(msg, CHAT_SIZE, "Obtained %dExp by killing %s", exp, clients[cid]->GetName());
+						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+					}
+					else {
+						sprintf_s(msg, CHAT_SIZE, "%s Killed %s", clients[id]->GetName(), clients[cid]->GetName());
+						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+					}
+				}
+				else {
+					char msg[CHAT_SIZE];
+					if (id == m_ID) {
+						sprintf_s(msg, CHAT_SIZE, "Damaged %d at %s", clients[id]->GetPower() * 2, clients[cid]->GetName());
+						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+					}
+					else {
+						sprintf_s(msg, CHAT_SIZE, "%s Damaged %d at %s", clients[id]->GetName(), clients[id]->GetPower() * 2, clients[cid]->GetName());
+						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+					}
+				}
 			}
 		}
 	}	
@@ -353,13 +406,15 @@ void CPlayer::Skill2()
 					see_monster.emplace_back(obj->GetID());
 			}
 
-			clients[cid]->SetCurHp(clients[cid]->GetCurHp() - m_power * 3);
+			clients[cid]->SetCurHp(clients[cid]->GetCurHp() - m_power * 4);
 
 			bool remove = false;
+			int exp = 0;
 			if (clients[cid]->GetCurHp() <= 0) {
 				remove = true;
-				dynamic_cast<CNpc*>(clients[cid])->m_active = false;
-				int exp = clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2;
+				dynamic_cast<CNpc*>(clients[cid])->SetDie(true);
+				timer_queue.push({ cid, chrono::system_clock::now() + 30s, EV_MONSTER_RESPAWN, 0 });
+				exp = clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2;
 				if (dynamic_cast<CNpc*>(clients[cid])->GetMonType() == MONSTER_TYPE::AGRO)
 					exp *= 2;
 				GainExp(exp);
@@ -369,8 +424,29 @@ void CPlayer::Skill2()
 
 			for (const auto id : see_monster) {
 				dynamic_cast<CPlayer*>(clients[id])->Send_Damage_Packet(cid, 3);
-				if (true == remove)
+				if (true == remove) {
 					clients[id]->Send_RemoveObject_Packet(cid);
+					char msg[CHAT_SIZE];
+					if (id == m_ID) {
+						sprintf_s(msg, CHAT_SIZE, "Obtained %dExp by killing %s", exp, clients[cid]->GetName());
+						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+					}
+					else {
+						sprintf_s(msg, CHAT_SIZE, "%s Killed %s", clients[id]->GetName(), clients[cid]->GetName());
+						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+					}
+				}
+				else {
+					char msg[CHAT_SIZE];
+					if (id == m_ID) {
+						sprintf_s(msg, CHAT_SIZE, "Damaged %d at %s", clients[id]->GetPower() * 4, clients[cid]->GetName());
+						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+					}
+					else {
+						sprintf_s(msg, CHAT_SIZE, "%s Damaged %d at %s", clients[id]->GetName(), clients[id]->GetPower() * 4, clients[cid]->GetName());
+						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+					}
+				}
 			}
 		}
 	}
@@ -415,10 +491,12 @@ void CPlayer::Skill3()
 			clients[cid]->SetCurHp(clients[cid]->GetCurHp() - m_power * 3);
 			
 			bool remove = false;
+			int exp = 0;
 			if (clients[cid]->GetCurHp() <= 0) {
 				remove = true;
-				dynamic_cast<CNpc*>(clients[cid])->m_active = false;
-				int exp = clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2;
+				dynamic_cast<CNpc*>(clients[cid])->SetDie(true);
+				timer_queue.push({ cid, chrono::system_clock::now() + 30s, EV_MONSTER_RESPAWN, 0 });
+				exp = clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2;
 				if (dynamic_cast<CNpc*>(clients[cid])->GetMonType() == MONSTER_TYPE::AGRO)
 					exp *= 2;
 				GainExp(exp);
@@ -428,8 +506,29 @@ void CPlayer::Skill3()
 
 			for (const auto id : see_monster) {
 				dynamic_cast<CPlayer*>(clients[id])->Send_Damage_Packet(cid, 3);
-				if (true == remove)
+				if (true == remove) {
 					clients[id]->Send_RemoveObject_Packet(cid);
+					char msg[CHAT_SIZE];
+					if (id == m_ID) {
+						sprintf_s(msg, CHAT_SIZE, "Obtained %dExp by killing %s", exp, clients[cid]->GetName());
+						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+					}
+					else {
+						sprintf_s(msg, CHAT_SIZE, "%s Killed %s", clients[id]->GetName(), clients[cid]->GetName());
+						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+					}
+				}
+				else {
+					char msg[CHAT_SIZE];
+					if (id == m_ID) {
+						sprintf_s(msg, CHAT_SIZE, "Damaged %d at %s", clients[id]->GetPower() * 3, clients[cid]->GetName());
+						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+					}
+					else {
+						sprintf_s(msg, CHAT_SIZE, "%s Damaged %d at %s", clients[id]->GetName(), clients[id]->GetPower() * 3, clients[cid]->GetName());
+						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+					}
+				}
 			}
 		}
 	}
@@ -510,12 +609,14 @@ void CPlayer::UseItem(int inven)
 			if (m_curHp > m_maxHp)
 				m_curHp = m_maxHp;
 			use = true;
+			Send_Chat_Packet(m_ID, "Used HP Potion");
 			break;
 		case ITEM_TYPE::MP_POTION:
 			m_curMp += 30;
 			if (m_curMp > m_maxMp)
 				m_curMp = m_maxMp;
 			use = true;
+			Send_Chat_Packet(m_ID, "Used MP Potion");
 			break;
 		default:
 			break;

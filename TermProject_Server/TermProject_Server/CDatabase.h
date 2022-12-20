@@ -11,6 +11,7 @@ public:
 
 	char* GetPlayerInfo(string name);
 	void SavePlayerInfo(int id, int x, int y);
+	void MakeNewInfo(char* name);
 
 private:
 	void Show_Error(SQLHANDLE hHandle, SQLSMALLINT hType, RETCODE RetCode);
