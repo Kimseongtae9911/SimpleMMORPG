@@ -10,7 +10,7 @@ public:
 	bool Initialize();
 
 	char* GetPlayerInfo(string name);
-	void SavePlayerInfo(int id, int x, int y);
+	void SavePlayerInfo(USER_INFO& ui);
 	void MakeNewInfo(char* name);
 
 private:

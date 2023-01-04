@@ -8,6 +8,7 @@ CDatabase* g_DB;
 HANDLE h_iocp;
 array<CObject*, MAX_USER + MAX_NPC> clients;
 char g_tilemap[W_HEIGHT][W_WIDTH];
+bool g_heal = false;
 
 SOCKET g_s_socket, g_c_socket;
 OVER_EXP g_a_over;
@@ -204,6 +205,9 @@ void worker_thread(HANDLE h_iocp)
 				TIMER_EVENT ev{ static_cast<int>(key), chrono::system_clock::now() + 5s, EV_PLAYER_HEAL, 0};
 				timer_queue.push(ev);
 			}
+			else {
+				g_heal = false;
+			}
 			break;
 		}
 		case OP_TYPE::OP_MONSTER_RESPAWN: {
@@ -329,7 +333,6 @@ void InitializeData()
 	}
 	cout << "Initialize NPC Start" << endl;
 	for (int i = MAX_USER; i < MAX_USER + MAX_NPC; ++i) {
-		//clients[i] = new CPlayer();
 		clients[i] = new CNpc(i);
 		lua_getglobal(dynamic_cast<CNpc*>(clients[i])->GetLua(), "monster_initialize");
 		lua_pushnumber(dynamic_cast<CNpc*>(clients[i])->GetLua(), dynamic_cast<CNpc*>(clients[i])->GetID());
@@ -371,6 +374,26 @@ bool CheckLoginFail(char* name)
 
 void disconnect(int c_id)
 {
+	CPlayer* pc = dynamic_cast<CPlayer*>(clients[c_id]);
+	USER_INFO ui;
+	memcpy(ui.name, pc->GetName(), NAME_SIZE);
+	ui.pos_x = pc->GetPosX();
+	ui.pos_y = pc->GetPosY();
+	ui.cur_hp = pc->GetCurHp();
+	ui.max_hp = pc->GetMaxHp();
+	ui.exp = pc->GetExp();
+	ui.cur_mp = pc->GetMp();
+	ui.max_mp = pc->GetMaxMp();
+	ui.level = pc->GetLevel();
+	ui.item1 = pc->GetItemType(0) - 1;
+	ui.item2 = pc->GetItemType(1) - 1;
+	ui.item3 = pc->GetItemType(2) - 1;
+	ui.item4 = pc->GetItemType(3) - 1;
+	ui.item5 = pc->GetItemType(4) - 1;
+	ui.item6 = pc->GetItemType(5) - 1;
+	ui.moneycnt = 78;
+	g_DB->SavePlayerInfo(ui);
+
 	clients[c_id]->m_ViewLock.lock();
 	unordered_set <int> vl = clients[c_id]->GetViewList();
 	clients[c_id]->m_ViewLock.unlock();
@@ -666,8 +689,11 @@ void do_npc_attack(int npc_id)
 		clients[i]->Send_Chat_Packet(i, msg);
 	}
 
-	TIMER_EVENT ev{ npc->GetTarget(), chrono::system_clock::now() + 5s, EV_PLAYER_HEAL, 0 };
-	timer_queue.push(ev);
+	if (g_heal == false) {
+		TIMER_EVENT ev{ npc->GetTarget(), chrono::system_clock::now() + 5s, EV_PLAYER_HEAL, 0 };
+		timer_queue.push(ev);
+		g_heal = true;
+	}
 }
 
 bool IsDest(int startX, int startY, int destX, int destY)
@@ -856,6 +882,73 @@ void process_packet(int c_id, char* packet)
 						else
 							WakeUpNPC(pl->GetID(), c_id);
 						clients[c_id]->Send_AddObject_Packet(pl->GetID());
+					}
+					CPlayer* player = dynamic_cast<CPlayer*>(clients[c_id]);
+					if (user_info->item1 != -1) {
+						player->SetItem(0, static_cast<ITEM_TYPE>(user_info->item1 + 1), user_info->moneycnt, true);
+						SC_ITEM_GET_PACKET p;
+						p.size = sizeof(p);
+						p.type = SC_ITEM_GET;
+						p.inven_num = 0;
+						p.item_type = static_cast<ITEM_TYPE>(user_info->item1 + 1);
+						p.x = player->GetPosX();
+						p.y = player->GetPosY();
+						player->SendPacket(&p);
+					}
+					if (user_info->item2 != -1) {
+						player->SetItem(1, static_cast<ITEM_TYPE>(user_info->item2 + 1), 0, true);
+						SC_ITEM_GET_PACKET p;
+						p.size = sizeof(p);
+						p.type = SC_ITEM_GET;
+						p.inven_num = 1;
+						p.item_type = static_cast<ITEM_TYPE>(user_info->item2 + 1);
+						p.x = player->GetPosX();
+						p.y = player->GetPosY();
+						player->SendPacket(&p);
+					}
+					if (user_info->item3 != 3) {
+						player->SetItem(2, static_cast<ITEM_TYPE>(user_info->item3 + 1), 0, true);
+						SC_ITEM_GET_PACKET p;
+						p.size = sizeof(p);
+						p.type = SC_ITEM_GET;
+						p.inven_num = 2;
+						p.item_type = static_cast<ITEM_TYPE>(user_info->item3 + 1);
+						p.x = player->GetPosX();
+						p.y = player->GetPosY();
+						player->SendPacket(&p);
+					}
+					if (user_info->item4 != -1) {
+						player->SetItem(3, static_cast<ITEM_TYPE>(user_info->item4 + 1), 0, true);
+						SC_ITEM_GET_PACKET p;
+						p.size = sizeof(p);
+						p.type = SC_ITEM_GET;
+						p.inven_num = 3;
+						p.item_type = static_cast<ITEM_TYPE>(user_info->item4 + 1);
+						p.x = player->GetPosX();
+						p.y = player->GetPosY();
+						player->SendPacket(&p);
+					}
+					if (user_info->item5 != -1) {
+						player->SetItem(4, static_cast<ITEM_TYPE>(user_info->item5 + 1), 0, true);
+						SC_ITEM_GET_PACKET p;
+						p.size = sizeof(p);
+						p.type = SC_ITEM_GET;
+						p.inven_num = 4;
+						p.item_type = static_cast<ITEM_TYPE>(user_info->item5 + 1);
+						p.x = player->GetPosX();
+						p.y = player->GetPosY();
+						player->SendPacket(&p);
+					}
+					if (user_info->item6 != -1) {
+						player->SetItem(5, static_cast<ITEM_TYPE>(user_info->item6 + 1), 0, true);
+						SC_ITEM_GET_PACKET p;
+						p.size = sizeof(p);
+						p.type = SC_ITEM_GET;
+						p.inven_num = 5;
+						p.item_type = static_cast<ITEM_TYPE>(user_info->item6 + 1);
+						p.x = player->GetPosX();
+						p.y = player->GetPosY();
+						player->SendPacket(&p);
 					}
 				}
 			}

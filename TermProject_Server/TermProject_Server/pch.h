@@ -12,6 +12,7 @@
 #include <set>
 #include <queue>
 #include <stack>
+#include <string>
 #include <concurrent_priority_queue.h>
 #include "protocol.h"
 
@@ -83,5 +84,12 @@ struct USER_INFO {
 	short pos_x;
 	short pos_y;
 	char name[NAME_SIZE + 1];
+	short item1;
+	short item2;
+	short item3;
+	short item4;
+	short item5;
+	short item6;
+	int moneycnt;
 };
 #pragma pack (pop)

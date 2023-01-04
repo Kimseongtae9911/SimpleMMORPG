@@ -574,8 +574,10 @@ void CScene::ProcessItemGetPacket(char* ptr)
 {
 	SC_ITEM_GET_PACKET* p = reinterpret_cast<SC_ITEM_GET_PACKET*>(ptr);
 	
+	bool login = true; 
 	for (int i = 0; i < m_itemVector.size(); ++i) {
 		if (m_itemVector[i]->m_x == p->x && m_itemVector[i]->m_y == p->y) {
+			login = false;
 			m_itemVector[i]->a_move(WINDOW_WIDTH + 25.f + (p->inven_num % 3) * TILE_WIDTH + (p->inven_num % 3 + 1) * 3.f, 270.f + (p->inven_num / 3) * TILE_WIDTH + (p->inven_num / 3 + 1) * 3.f);
 			m_inventory[p->inven_num] = m_itemVector[i];
 			m_itemVector.erase(m_itemVector.begin() + i);
@@ -589,6 +591,20 @@ void CScene::ProcessItemGetPacket(char* ptr)
 				m_moneyText.setPosition(sf::Vector2f(WINDOW_WIDTH + 25.f + (p->inven_num % 3) * TILE_WIDTH + (p->inven_num % 3 + 1) * 3.f + 1, 270.f + (p->inven_num / 3) * TILE_WIDTH + (p->inven_num / 3 + 1) * 3.f + 1));
 			}
 			break;
+		}
+	}
+	if (true == login) {
+		CItem* item = new CItem(*m_items, static_cast<ITEM_TYPE>(p->item_type), WINDOW_WIDTH + 25.f + (p->inven_num % 3) * TILE_WIDTH + (p->inven_num % 3 + 1) * 3.f, 270.f + (p->inven_num / 3) * TILE_WIDTH + (p->inven_num / 3 + 1) * 3.f);
+		item->a_move(WINDOW_WIDTH + 25.f + (p->inven_num % 3) * TILE_WIDTH + (p->inven_num % 3 + 1) * 3.f, 270.f + (p->inven_num / 3) * TILE_WIDTH + (p->inven_num / 3 + 1) * 3.f);
+		m_inventory[p->inven_num] = item;
+		if (p->item_type == ITEM_TYPE::MONEY) {
+			m_moneyEnable = true;
+			m_money = 77;
+			m_moneyText.setString(to_string(m_money));
+			m_moneyText.setCharacterSize(10);
+			m_moneyText.setFont(g_font);
+			m_moneyText.setFillColor(sf::Color(255, 255, 255));
+			m_moneyText.setPosition(sf::Vector2f(WINDOW_WIDTH + 25.f + (p->inven_num % 3) * TILE_WIDTH + (p->inven_num % 3 + 1) * 3.f + 1, 270.f + (p->inven_num / 3) * TILE_WIDTH + (p->inven_num / 3 + 1) * 3.f + 1));
 		}
 	}
 }

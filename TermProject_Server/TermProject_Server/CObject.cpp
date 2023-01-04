@@ -633,6 +633,18 @@ void CPlayer::UseItem(int inven)
 	}
 }
 
+const ITEM_TYPE CPlayer::GetItemType(int index) const
+{
+	return m_items[index]->GetItemType();
+}
+
+void CPlayer::SetItem(int index, ITEM_TYPE type, int num, bool enable)
+{
+	m_items[index]->SetEnable(enable);
+	m_items[index]->SetNum(num);
+	m_items[index]->SetItemType(type);
+}
+
 void CPlayer::Send_LoginInfo_Packet()
 {
 	SC_LOGIN_INFO_PACKET p;

@@ -167,6 +167,9 @@ public:
 	void CreateItem(short x, short y);
 	void UseItem(int inven);
 
+	const ITEM_TYPE GetItemType(int index) const;
+	void SetItem(int index, ITEM_TYPE type, int num, bool enable);
+
 public:
 	mutex m_itemLock;
 
