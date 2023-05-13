@@ -35,51 +35,41 @@ constexpr char SC_ITEM_GET = 12;
 constexpr char SC_ITEM_USED = 13;
 
 #pragma pack (push, 1)
-struct CS_LOGIN_PACKET {
+
+struct BASE_PACKET {
 	unsigned char size;
-	char	type;
+	char type;
+};
+
+struct CS_LOGIN_PACKET : BASE_PACKET {
 	char	name[NAME_SIZE];
 };
 
-struct CS_MOVE_PACKET {
-	unsigned char size;
-	char	type;
+struct CS_MOVE_PACKET : BASE_PACKET {
 	char	direction;  // 0 : UP, 1 : DOWN, 2 : LEFT, 3 : RIGHT
 	unsigned	move_time;
 };
 
-struct CS_CHAT_PACKET {
-	unsigned char size;
-	char	type;
+struct CS_CHAT_PACKET : BASE_PACKET {
 	char	mess[CHAT_SIZE];
 };
 
-struct CS_TELEPORT_PACKET {
-	unsigned char size;
-	char	type;
+struct CS_TELEPORT_PACKET : BASE_PACKET {
 };
 
-struct CS_LOGOUT_PACKET {
-	unsigned char size;
-	char	type;
+struct CS_LOGOUT_PACKET : BASE_PACKET {
 };
 
-struct CS_ATTACK_PACKET {
-	unsigned char size;
-	char type;
+struct CS_ATTACK_PACKET : BASE_PACKET {
 	char skill;	// 0: normal attack
 	std::chrono::system_clock::time_point time;
 };
 
-struct CS_USE_ITEM_PACKET {
-	unsigned char size;
-	char type;	
+struct CS_USE_ITEM_PACKET : BASE_PACKET {
 	int inven;
 };
 
-struct SC_LOGIN_INFO_PACKET {
-	unsigned char size;
-	char	type;
+struct SC_LOGIN_INFO_PACKET : BASE_PACKET {
 	int		id;
 	int		hp;
 	int		max_hp;
@@ -91,9 +81,7 @@ struct SC_LOGIN_INFO_PACKET {
 	char	name[NAME_SIZE];
 };
 
-struct SC_ADD_OBJECT_PACKET {
-	unsigned char size;
-	char	type;
+struct SC_ADD_OBJECT_PACKET : BASE_PACKET {
 	int		id;
 	short	x, y;
 	int level;
@@ -102,41 +90,29 @@ struct SC_ADD_OBJECT_PACKET {
 	char	name[NAME_SIZE];
 };
 
-struct SC_REMOVE_OBJECT_PACKET {
-	unsigned char size;
-	char	type;
+struct SC_REMOVE_OBJECT_PACKET : BASE_PACKET {
 	int		id;
 };
 
-struct SC_MOVE_OBJECT_PACKET {
-	unsigned char size;
-	char	type;
+struct SC_MOVE_OBJECT_PACKET : BASE_PACKET {
 	int		id;
 	short	x, y;
 	unsigned int move_time;
 };
 
-struct SC_CHAT_PACKET {
-	unsigned char size;
-	char	type;
+struct SC_CHAT_PACKET : BASE_PACKET {
 	int		id;
 	char	mess[CHAT_SIZE];
 };
 
-struct SC_LOGIN_OK_PACKET {
-	unsigned char size;
-	char	type;
+struct SC_LOGIN_OK_PACKET : BASE_PACKET {
 };
 
-struct SC_LOGIN_FAIL_PACKET {
-	unsigned char size;
-	char	type;
+struct SC_LOGIN_FAIL_PACKET : BASE_PACKET {
 
 };
 
-struct SC_STAT_CHANGE_PACKET {
-	unsigned char size;
-	char	type;
+struct SC_STAT_CHANGE_PACKET : BASE_PACKET {
 	int		hp;
 	int		max_hp;
 	int		mp;
@@ -145,31 +121,23 @@ struct SC_STAT_CHANGE_PACKET {
 	int		level;
 };
 
-struct SC_DAMAGE_PACKET {
-	unsigned char size;
-	char	type;
+struct SC_DAMAGE_PACKET : BASE_PACKET {
 	int id;
 	int hp;
 };
 
-struct SC_ITEM_ADD_PACKET {
-	unsigned char size;
-	char	type;
+struct SC_ITEM_ADD_PACKET : BASE_PACKET {
 	int item_type;
 	short x, y;
 };
 
-struct SC_ITEM_GET_PACKET {
-	unsigned char size;
-	char	type;
+struct SC_ITEM_GET_PACKET : BASE_PACKET {
 	int item_type;
 	int inven_num;
 	short x, y;
 };
 
-struct SC_ITEM_USED_PACKET {
-	unsigned char size;
-	char	type;
+struct SC_ITEM_USED_PACKET : BASE_PACKET {
 	int inven_num;
 };
 #pragma pack (pop)

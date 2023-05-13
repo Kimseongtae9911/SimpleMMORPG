@@ -2,6 +2,8 @@
 #include "CObject.h"
 #include "LuaFunc.h"
 #include "CItem.h"
+#include "CNetworkMgr.h"
+#include "GameUtil.h"
 
 extern HANDLE h_iocp;
 extern array<CObject*, MAX_USER + MAX_NPC> clients;
@@ -115,6 +117,14 @@ void CObject::Send_RemoveObject_Packet(int c_id)
 	SendPacket(&p);
 }
 
+const bool CObject::CanSee(int to) const
+{
+	if (abs(GetPosX() - clients[to]->GetPosX()) > VIEW_RANGE)
+		return false;
+
+	return abs(GetPosY() - clients[to]->GetPosY()) <= VIEW_RANGE;
+}
+
 const bool CObject::CanSee(int from, int to) const
 {
 	if (abs(clients[from]->GetPosX() - clients[to]->GetPosX()) > VIEW_RANGE)
@@ -143,6 +153,328 @@ CNpc::CNpc(int id)
 
 CNpc::~CNpc()
 {
+}
+
+void CNpc::Attack()
+{
+	if (m_active == false)
+		return;
+
+	CPlayer* player = reinterpret_cast<CPlayer*>(CNetworkMgr::GetInstance()->GetCObject(m_target));
+
+	player->SetCurHp(player->GetCurHp() - GetPower());
+	if (player->GetCurHp() <= 0) {
+		player->SetCurHp(player->GetMaxHp() / 2);
+		player->SetMp(player->GetMaxMp() / 2);
+		player->SetExp(player->GetExp() / 2);
+		player->SetPos(48, 47);
+		player->Send_Move_Packet(player->GetID());
+		player->Send_StatChange_Packet();
+	}
+	else {
+		player->Send_StatChange_Packet();
+	}
+
+	char msg[CHAT_SIZE];
+
+	for (int i = 0; i < MAX_USER; ++i) {
+		if (CNetworkMgr::GetInstance()->GetCObject(i)->GetState() != CL_STATE::ST_INGAME)
+			continue;
+		if (i == player->GetID()) {
+			sprintf_s(msg, CHAT_SIZE, "%dDamage from %s", GetPower(), GetName());
+		}
+		else {
+			sprintf_s(msg, CHAT_SIZE, "%s has been damaged %d by %s", player->GetName(), GetPower(), GetName());
+		}
+		CNetworkMgr::GetInstance()->GetCObject(i)->Send_Chat_Packet(i, msg);
+	}
+
+	if (player->GetHeal() == false) {
+		TIMER_EVENT ev{ GetTarget(), chrono::system_clock::now() + 5s, EV_PLAYER_HEAL, 0 };
+		timer_queue.push(ev);
+		player->SetHeal(true);
+	}
+}
+
+void CNpc::Chase()
+{
+	unordered_set<int> old_vl;
+	for (auto& obj : CNetworkMgr::GetInstance()->GetAllObject()) {
+		if (CL_STATE::ST_INGAME != obj->GetState())
+			continue;
+		if (obj->GetID() >= MAX_USER)
+			continue;
+		if (true == CanSee(obj->GetID()))
+			old_vl.insert(obj->GetID());
+	}
+
+	int x = 0;
+	int y = 0;
+	if (AStar(m_PosX, m_PosY, CNetworkMgr::GetInstance()->GetCObject(m_target)->GetPosX(), CNetworkMgr::GetInstance()->GetCObject(m_target)->GetPosY(), &x, &y))
+	{
+		m_PosX = x;
+		m_PosY = y;
+	}
+	else
+		return;
+
+	// 움직인 이후에 해당 NPC가 시야에 있는 플레이어들
+	unordered_set<int> new_vl;
+	for (auto& obj : CNetworkMgr::GetInstance()->GetAllObject()) {
+		if (CL_STATE::ST_INGAME != obj->GetState())
+			continue;
+		if (obj->GetID() >= MAX_USER)
+			continue;
+		if (true == CanSee(obj->GetID()))
+			new_vl.insert(obj->GetID());
+	}
+
+	for (auto pl : new_vl) {
+		// new_vl에는 있는데 old_vl에는 없을 때 플레이어의 시야에 등장
+		if (0 == old_vl.count(pl)) {
+			CNetworkMgr::GetInstance()->GetCObject(pl)->Send_AddObject_Packet(m_ID);
+		}
+		else {
+			// 플레이어가 계속 보고 있음.
+			CNetworkMgr::GetInstance()->GetCObject(pl)->Send_Move_Packet(m_ID);
+		}
+	}
+
+	for (auto pl : old_vl) {
+		if (0 == new_vl.count(pl)) {
+			CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.lock();
+			if (0 != CNetworkMgr::GetInstance()->GetCObject(pl)->GetViewList().count(m_ID)) {
+				CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.unlock();
+				CNetworkMgr::GetInstance()->GetCObject(pl)->Send_RemoveObject_Packet(m_ID);
+			}
+			else {
+				CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.unlock();
+			}
+		}
+	}
+}
+
+void CNpc::RandomMove()
+{	
+	unordered_set<int> old_vl;
+	for (auto& obj : CNetworkMgr::GetInstance()->GetAllObject()) {
+		if (CL_STATE::ST_INGAME != obj->GetState())
+			continue;
+		if (obj->GetID() >= MAX_USER)
+			continue;
+		if (true == CanSee(obj->GetID()))
+			old_vl.insert(obj->GetID());
+	}
+
+	int x = m_PosX;
+	int y = m_PosY;
+	int dir = rand() % 4;
+	if (GameUtil::CanMove(x, y, dir)) {
+		switch (dir) {
+		case 0:	y--; break;
+		case 1:	y++; break;
+		case 2:	x--; break;
+		case 3:	x++; break;
+		}
+		SetPos(x, y);
+	}
+
+	// 움직인 이후에 해당 NPC가 시야에 있는 플레이어들
+	unordered_set<int> new_vl;
+	for (auto& obj : CNetworkMgr::GetInstance()->GetAllObject()) {
+		if (CL_STATE::ST_INGAME != obj->GetState())
+			continue;
+		if (obj->GetID() >= MAX_USER)
+			continue;
+		if (true == CanSee(obj->GetID()))
+			new_vl.insert(obj->GetID());
+	}
+
+	for (auto pl : new_vl) {
+		// new_vl에는 있는데 old_vl에는 없을 때 플레이어의 시야에 등장
+		if (0 == old_vl.count(pl)) {
+			CNetworkMgr::GetInstance()->GetCObject(pl)->Send_AddObject_Packet(m_ID);
+		}
+		else {
+			// 플레이어가 계속 보고 있음.
+			CNetworkMgr::GetInstance()->GetCObject(pl)->Send_Move_Packet(m_ID);
+		}
+	}
+
+	for (auto pl : old_vl) {
+		if (0 == new_vl.count(pl)) {
+			CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.lock();
+			if (0 != CNetworkMgr::GetInstance()->GetCObject(pl)->GetViewList().count(m_ID)) {
+				CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.unlock();
+				CNetworkMgr::GetInstance()->GetCObject(pl)->Send_RemoveObject_Packet(m_ID);
+			}
+			else {
+				CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.unlock();
+			}
+		}
+	}
+}
+
+bool CNpc::Agro(int to)
+{
+	if (abs(m_PosX - CNetworkMgr::GetInstance()->GetCObject(to)->GetPosX()) > MONSTER_VIEW)
+		return false;
+
+	return abs(m_PosY - CNetworkMgr::GetInstance()->GetCObject(to)->GetPosY()) <= MONSTER_VIEW;
+}
+
+void CNpc::WakeUp(int waker)
+{
+	//OVER_EXP* exover = new OVER_EXP;
+	//exover->m_comp_type = OP_TYPE::OP_AI_HELLO;
+	//exover->m_ai_target_obj = waker;
+	//PostQueuedCompletionStatus(h_iocp, 1, npc_id, &exover->m_over);
+
+	if (m_active)
+		return;
+	bool old_state = false;
+	if (false == atomic_compare_exchange_strong(&m_active, &old_state, true))
+		return;
+	TIMER_EVENT ev{ m_ID, chrono::system_clock::now(), EV_RANDOM_MOVE, 0 };
+	timer_queue.push(ev);
+}
+
+bool CNpc::AStar(int startX, int startY, int destX, int destY, int* resultx, int* resulty)
+{
+	int dx1[4] = { 0, 0, 1, -1 };
+	int dy1[4] = { -1, 1, 0, 0 };
+
+	if (!IsValid(startX, startY) || !IsValid(destX, destY)) return false;
+	if (!IsUnBlocked(startX, startY) || !IsUnBlocked(destX, destY)) return false;
+	if (IsDest(startX, startY, destX, destY)) return false;
+
+	bool** closedList = new bool* [W_HEIGHT];
+	for (int i = 0; i < W_HEIGHT; ++i) {
+		closedList[i] = new bool[W_WIDTH];
+
+		for (int j = 0; j < W_WIDTH; ++j) {
+			closedList[i][j] = false;
+		}
+	}
+
+	Node** node = new Node * [W_HEIGHT];
+	for (int i = 0; i < W_HEIGHT; ++i) {
+		node[i] = new Node[W_WIDTH];
+	}
+
+	for (int i = 0; i < W_HEIGHT; ++i) {
+		for (int j = 0; j < W_WIDTH; ++j) {
+			node[i][j].f = node[i][j].g = node[i][j].h = INF;
+			node[i][j].parentX = node[i][j].parentY = -1;
+		}
+	}
+
+	node[startY][startX].f = node[startY][startX].g = node[startY][startX].h = 0.f;
+	node[startY][startX].parentX = startX;
+	node[startY][startX].parentY = startY;
+
+	priority_queue<WeightPos> openList;
+	//set<WeightPos> openList;
+	openList.push({ 0.f, startX, startY });
+	//openList.insert({ 0.f, startX, startY });
+
+	while (!openList.empty()) {
+		//WeightPos wp = *openList.begin();
+		//openList.erase(openList.begin());
+		WeightPos wp = openList.top();
+		openList.pop();
+
+		int x = wp.x;
+		int y = wp.y;
+
+		closedList[y][x] = true;
+
+		double nf, ng, nh;
+
+		for (int i = 0; i < 4; ++i) {
+			int ny = y + dy1[i];
+			int nx = x + dx1[i];
+
+			if (IsValid(nx, ny)) {
+				if (IsDest(nx, ny, destX, destY)) {
+					node[ny][nx].parentX = x;
+					node[ny][nx].parentY = y;
+					FindPath(node, destX, destY, resultx, resulty);
+					for (int i = 0; i < W_HEIGHT; ++i) {
+						delete[] closedList[i];
+					}
+					delete[] closedList;
+					return true;
+				}
+				else if (!closedList[ny][nx] && IsUnBlocked(nx, ny)) {
+					ng = node[y][x].g + 1.0f;
+					nh = CalH(nx, ny, destX, destY);
+					nf = ng + nh;
+
+					if (node[ny][nx].f == INF || node[ny][nx].f > nf) {
+						node[ny][nx].f = nf;
+						node[ny][nx].g = ng;
+						node[ny][nx].h = nh;
+						node[ny][nx].parentX = x;
+						node[ny][nx].parentY = y;
+
+						//openList.insert({ nf, nx, ny });
+						openList.push({ nf, nx, ny });
+					}
+				}
+			}
+		}
+	}
+
+	return false;
+}
+
+bool CNpc::IsDest(int startX, int startY, int destX, int destY)
+{
+	if (startX == destX && startY == destY)
+		return true;
+
+	return false;
+}
+
+bool CNpc::IsValid(int x, int y)
+{
+	return (x >= 0 && x < W_WIDTH&& y >= 0 && y < W_HEIGHT);
+}
+
+bool CNpc::IsUnBlocked(int x, int y)
+{
+	if (GameUtil::GetTile(y, x) == 'D' || GameUtil::GetTile(y, x) == 'G')
+		return true;
+
+	return false;
+}
+
+double CNpc::CalH(int x, int y, int destX, int destY)
+{
+	return (abs(x - destX) + abs(y - destY));
+}
+
+void CNpc::FindPath(Node* node[], int destX, int destY, int* x, int* y)
+{
+	stack<Node> s;
+	s.push({ destX, destY });
+	while (!(node[destY][destX].parentX == destX && node[destY][destX].parentY == destY)) {
+		int tempx = node[destY][destX].parentX;
+		int tempy = node[destY][destX].parentY;
+		destX = tempx;
+		destY = tempy;
+		s.push({ destX, destY });
+	}
+
+	s.pop();
+	*x = s.top().parentX;
+	*y = s.top().parentY;
+
+	for (int i = 0; i < W_HEIGHT; ++i)
+		delete[] node[i];
+
+	delete[] node;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -643,6 +975,41 @@ void CPlayer::SetItem(int index, ITEM_TYPE type, int num, bool enable)
 	m_items[index]->SetEnable(enable);
 	m_items[index]->SetNum(num);
 	m_items[index]->SetItemType(type);
+}
+
+bool CPlayer::CanUse(char skill, chrono::system_clock::time_point time)
+{
+	switch (skill) {
+	case 0:
+		if (chrono::duration_cast<chrono::seconds>(time - m_usedTime[0]).count() >= ATTACK_COOL) {
+			m_usedTime[0] = time;
+			return true;
+		}
+		break;
+	case 1:
+		if (chrono::duration_cast<chrono::seconds>(time - m_usedTime[1]).count() >= SKILL1_COOL &&
+			m_curMp >= 15) {
+			m_usedTime[1] = time;
+			return true;
+		}
+		break;
+	case 2:
+		if (chrono::duration_cast<chrono::seconds>(time - m_usedTime[2]).count() >= SKILL2_COOL &&
+			m_curMp >= 5) {
+			m_usedTime[2] = time;
+			return true;
+		}
+		break;
+	case 3:
+		if (chrono::duration_cast<chrono::seconds>(time - m_usedTime[3]).count() >= SKILL3_COOL &&
+			m_curMp >= 10) {
+			m_usedTime[3] = time;
+			return true;
+		}
+		break;
+	}
+	return false;
+
 }
 
 void CPlayer::Send_LoginInfo_Packet()

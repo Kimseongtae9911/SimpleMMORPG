@@ -13,6 +13,18 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="소스 파일\Server">
+      <UniqueIdentifier>{f5b5d495-1eac-4e42-b3f2-0bb0fa1bbe4d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Manager">
+      <UniqueIdentifier>{e1f09165-52a0-4e53-8f02-ea1e326e4711}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Object">
+      <UniqueIdentifier>{a9cf9559-57a3-4c7e-85cf-3874d3ef10e4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Util">
+      <UniqueIdentifier>{adc9de9c-0296-4ded-867b-ffeeaf4cc5ee}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -21,24 +33,36 @@
     <ClInclude Include="protocol.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="CObject.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="LuaFunc.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="CDatabase.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="CServer.h">
+      <Filter>소스 파일\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="CNetworkMgr.h">
+      <Filter>소스 파일\Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="OverExp.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="CObject.h">
+      <Filter>소스 파일\Object</Filter>
+    </ClInclude>
     <ClInclude Include="CItem.h">
+      <Filter>소스 파일\Object</Filter>
+    </ClInclude>
+    <ClInclude Include="GameUtil.h">
+      <Filter>소스 파일\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="CPacketMgr.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="CObject.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="LuaFunc.cpp">
@@ -47,7 +71,25 @@
     <ClCompile Include="CDatabase.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="CServer.cpp">
+      <Filter>소스 파일\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="CNetworkMgr.cpp">
+      <Filter>소스 파일\Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="OverExp.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="CObject.cpp">
+      <Filter>소스 파일\Object</Filter>
+    </ClCompile>
     <ClCompile Include="CItem.cpp">
+      <Filter>소스 파일\Object</Filter>
+    </ClCompile>
+    <ClCompile Include="GameUtil.cpp">
+      <Filter>소스 파일\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="CPacketMgr.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>

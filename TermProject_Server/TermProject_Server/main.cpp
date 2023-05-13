@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "CObject.h"
 #include "CDatabase.h"
+#include "CNetworkMgr.h"
 
 concurrency::concurrent_priority_queue<TIMER_EVENT> timer_queue;
 

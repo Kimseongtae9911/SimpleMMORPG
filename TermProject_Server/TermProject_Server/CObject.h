@@ -70,6 +70,7 @@ public:
 	const unordered_set<int>& GetViewList() const {return m_view_list; }
 	const SOCKET& GetSocket() const { return m_Socket; }
 
+	const bool CanSee(int to) const;
 	const bool CanSee(int from, int to) const;
 
 public:
@@ -117,6 +118,21 @@ public:
 	const bool GetDie() const { return m_die; }
 	const short GetRespawnX() const { return m_respawnX; }
 	const short GetRespawnY() const { return m_respawnY; }
+
+	void Attack();
+	void Chase();
+	void RandomMove();
+
+	bool Agro(int to);
+	void WakeUp(int waker);
+
+private:
+	bool AStar(int startX, int startY, int destX, int destY, int* resultx, int* resulty);
+	bool IsDest(int startX, int startY, int destX, int destY);
+	bool IsValid(int x, int y);
+	bool IsUnBlocked(int x, int y);
+	double CalH(int x, int y, int destX, int destY);
+	void FindPath(Node* node[], int destX, int destY, int* x, int* y);
 
 public:
 	atomic_bool	m_active;
@@ -170,6 +186,10 @@ public:
 	const ITEM_TYPE GetItemType(int index) const;
 	void SetItem(int index, ITEM_TYPE type, int num, bool enable);
 
+	bool GetHeal() const { return m_heal; }
+	void SetHeal(bool heal) { m_heal = heal; }
+	bool CanUse(char skill, chrono::system_clock::time_point time);
+
 public:
 	mutex m_itemLock;
 
@@ -184,4 +204,6 @@ private:
 	DIR m_dir;
 	array<chrono::system_clock::time_point, 4> m_usedTime;
 	array<CItem*, 6> m_items;
+
+	bool m_heal;
 };

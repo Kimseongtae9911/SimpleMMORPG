@@ -14,6 +14,8 @@
 #include <stack>
 #include <string>
 #include <concurrent_priority_queue.h>
+#include <unordered_map>
+#include <functional>
 #include "protocol.h"
 
 extern "C" {
@@ -33,6 +35,26 @@ constexpr int MONSTER_VIEW = 5;
 constexpr int INIT_EXP = 10;
 constexpr int EXP_UP = 40;
 constexpr int INF = 2140000000;
+
+#define SINGLETON(ClassName)									\
+public:															\
+	ClassName() {};												\
+	~ClassName() {};											\
+	ClassName(ClassName const&) = delete;						\
+	ClassName& operator=(const ClassName&) = delete;			\
+	static ClassName* GetInstance()	{							\
+		if(!m_instance)											\
+			m_instance.reset(new ClassName);					\
+		return m_instance.get();								\
+	}															\
+																\
+	void DestroyInstance()										\
+	{															\
+		if (m_instance)											\
+			m_instance.reset(nullptr);							\
+	}															\
+private:														\
+	static std::unique_ptr<ClassName> m_instance;
 
 enum class DIR {LEFT, RIGHT, UP, DOWN};
 

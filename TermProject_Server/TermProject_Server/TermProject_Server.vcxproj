@@ -120,7 +120,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Create</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <LanguageStandard>stdcpp14</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -137,7 +137,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Create</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <LanguageStandard>stdcpp14</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -149,17 +149,27 @@
   <ItemGroup>
     <ClInclude Include="CDatabase.h" />
     <ClInclude Include="CItem.h" />
+    <ClInclude Include="CNetworkMgr.h" />
     <ClInclude Include="CObject.h" />
+    <ClInclude Include="CPacketMgr.h" />
+    <ClInclude Include="CServer.h" />
+    <ClInclude Include="GameUtil.h" />
     <ClInclude Include="LuaFunc.h" />
+    <ClInclude Include="OverExp.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="protocol.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CDatabase.cpp" />
     <ClCompile Include="CItem.cpp" />
+    <ClCompile Include="CNetworkMgr.cpp" />
     <ClCompile Include="CObject.cpp" />
+    <ClCompile Include="CPacketMgr.cpp" />
+    <ClCompile Include="CServer.cpp" />
+    <ClCompile Include="GameUtil.cpp" />
     <ClCompile Include="LuaFunc.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="OverExp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="lua54.lib" />
