@@ -20,6 +20,8 @@ public:
 
 	CDatabase* GetDatabase() const { return m_database; }
 
+	void RegisterEvent(TIMER_EVENT& ev) { m_timerQueue.push(ev); }
+
 private:
 	void Accept(int id, int bytes, OVER_EXP* over_ex);
 	void MonsterRespawn(int id, int bytes, OVER_EXP* over_ex);

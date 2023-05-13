@@ -71,7 +71,6 @@ public:
 	const SOCKET& GetSocket() const { return m_Socket; }
 
 	const bool CanSee(int to) const;
-	const bool CanSee(int from, int to) const;
 
 public:
 	mutex m_StateLock;

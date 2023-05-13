@@ -2,6 +2,7 @@
 #include "GameUtil.h"
 
 char GameUtil::tilemap[W_HEIGHT][W_WIDTH];
+ITEM_TYPE GameUtil::itemmap[W_HEIGHT][W_WIDTH] = { NONE, };
 
 bool GameUtil::InitailzeData()
 {

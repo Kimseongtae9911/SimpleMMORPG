@@ -5,12 +5,6 @@
 #include "CNetworkMgr.h"
 #include "GameUtil.h"
 
-extern HANDLE h_iocp;
-extern array<CObject*, MAX_USER + MAX_NPC> clients;
-extern concurrency::concurrent_priority_queue<TIMER_EVENT> timer_queue;
-
-ITEM_TYPE itemmap[W_HEIGHT][W_WIDTH] = { NONE, };
-
 CObject::CObject()
 {
 	m_ID = -1;
@@ -54,8 +48,8 @@ void CObject::Send_Move_Packet(int c_id)
 	p.id = c_id;
 	p.size = sizeof(SC_MOVE_OBJECT_PACKET);
 	p.type = SC_MOVE_OBJECT;
-	p.x = clients[c_id]->GetPosX();
-	p.y = clients[c_id]->GetPosY();
+	p.x = CNetworkMgr::GetInstance()->GetCObject(c_id)->GetPosX();
+	p.y = CNetworkMgr::GetInstance()->GetCObject(c_id)->GetPosY();
 	p.move_time = last_move_time;
 	SendPacket(&p);
 }
@@ -64,16 +58,16 @@ void CObject::Send_AddObject_Packet(int c_id)
 {
 	SC_ADD_OBJECT_PACKET add_packet;
 	add_packet.id = c_id;
-	strcpy_s(add_packet.name, clients[c_id]->GetName());
+	strcpy_s(add_packet.name, CNetworkMgr::GetInstance()->GetCObject(c_id)->GetName());
 	add_packet.size = sizeof(add_packet);
 	add_packet.type = SC_ADD_OBJECT;
-	add_packet.x = clients[c_id]->GetPosX();
-	add_packet.y = clients[c_id]->GetPosY();
+	add_packet.x = CNetworkMgr::GetInstance()->GetCObject(c_id)->GetPosX();
+	add_packet.y = CNetworkMgr::GetInstance()->GetCObject(c_id)->GetPosY();
 
 	if (c_id >= MAX_USER) {
-		add_packet.level = clients[c_id]->GetLevel();
-		add_packet.hp = clients[c_id]->GetCurHp();
-		add_packet.max_hp = clients[c_id]->GetMaxHp();
+		add_packet.level = CNetworkMgr::GetInstance()->GetCObject(c_id)->GetLevel();
+		add_packet.hp = CNetworkMgr::GetInstance()->GetCObject(c_id)->GetCurHp();
+		add_packet.max_hp = CNetworkMgr::GetInstance()->GetCObject(c_id)->GetMaxHp();
 		if (add_packet.hp <= 0) {
 			return;
 		}
@@ -119,18 +113,10 @@ void CObject::Send_RemoveObject_Packet(int c_id)
 
 const bool CObject::CanSee(int to) const
 {
-	if (abs(GetPosX() - clients[to]->GetPosX()) > VIEW_RANGE)
+	if (abs(GetPosX() - CNetworkMgr::GetInstance()->GetCObject(to)->GetPosX()) > VIEW_RANGE)
 		return false;
 
-	return abs(GetPosY() - clients[to]->GetPosY()) <= VIEW_RANGE;
-}
-
-const bool CObject::CanSee(int from, int to) const
-{
-	if (abs(clients[from]->GetPosX() - clients[to]->GetPosX()) > VIEW_RANGE)
-		return false;
-
-	return abs(clients[from]->GetPosY() - clients[to]->GetPosY()) <= VIEW_RANGE;
+	return abs(GetPosY() - CNetworkMgr::GetInstance()->GetCObject(to)->GetPosY()) <= VIEW_RANGE;
 }
 
 CNpc::CNpc(int id)
@@ -191,7 +177,7 @@ void CNpc::Attack()
 
 	if (player->GetHeal() == false) {
 		TIMER_EVENT ev{ GetTarget(), chrono::system_clock::now() + 5s, EV_PLAYER_HEAL, 0 };
-		timer_queue.push(ev);
+		CNetworkMgr::GetInstance()->RegisterEvent(ev);
 		player->SetHeal(true);
 	}
 }
@@ -335,8 +321,8 @@ void CNpc::WakeUp(int waker)
 	bool old_state = false;
 	if (false == atomic_compare_exchange_strong(&m_active, &old_state, true))
 		return;
-	TIMER_EVENT ev{ m_ID, chrono::system_clock::now(), EV_RANDOM_MOVE, 0 };
-	timer_queue.push(ev);
+	TIMER_EVENT ev{ m_ID, chrono::system_clock::now(), EV_RANDOM_MOVE, 0 };	
+	CNetworkMgr::GetInstance()->RegisterEvent(ev);
 }
 
 bool CNpc::AStar(int startX, int startY, int destX, int destY, int* resultx, int* resulty)
@@ -502,16 +488,15 @@ void CPlayer::PlayerAccept(int id, SOCKET sock)
 	m_Name[0] = 0;
 	m_RemainBuf_Size = 0;
 	m_Socket = sock;
-	CreateIoCompletionPort(reinterpret_cast<HANDLE>(m_Socket), h_iocp, id, 0);
 	RecvPacket();
 }
 
 void CPlayer::CheckItem()
 {
-	if (ITEM_TYPE::NONE != itemmap[m_PosY][m_PosX]) {
+	if (ITEM_TYPE::NONE != GameUtil::GetItemTile(m_PosY, m_PosX)) {
 		int index = -1;
 		bool money = false;
-		if (ITEM_TYPE::MONEY == itemmap[m_PosY][m_PosX]) {
+		if (ITEM_TYPE::MONEY == GameUtil::GetItemTile(m_PosY, m_PosX)) {
 			for (int i = 0; i < m_items.size(); ++i) {
 				if (false == m_items[i]->GetEnable() && -1 == index) {
 					index = i;
@@ -528,7 +513,7 @@ void CPlayer::CheckItem()
 			if (false == money) {
 				m_itemLock.lock();
 				m_items[index]->SetEnable(true);
-				m_items[index]->SetItemType(itemmap[m_PosY][m_PosX]);
+				m_items[index]->SetItemType(GameUtil::GetItemTile(m_PosY, m_PosX));
 				m_itemLock.unlock();
 			}
 		}
@@ -538,7 +523,7 @@ void CPlayer::CheckItem()
 					index = i;
 					m_itemLock.lock();
 					m_items[i]->SetEnable(true);
-					m_items[i]->SetItemType(itemmap[m_PosY][m_PosX]);
+					m_items[i]->SetItemType(GameUtil::GetItemTile(m_PosY, m_PosX));
 					m_itemLock.unlock();
  					break;
 				}
@@ -584,7 +569,7 @@ void CPlayer::CheckItem()
 			sprintf_s(msg, CHAT_SIZE, "%s Obtained", item);
 			Send_Chat_Packet(m_ID, msg);
 		}
-		itemmap[m_PosY][m_PosX] = ITEM_TYPE::NONE;
+		GameUtil::SetItemTile(m_PosY, m_PosX, ITEM_TYPE::NONE);
 	}
 }
 
@@ -595,22 +580,23 @@ void CPlayer::Attack()
 	m_ViewLock.unlock();
 
 	for (const auto id : v_list) {
+		CObject* client = CNetworkMgr::GetInstance()->GetCObject(id);
 		if (id < MAX_USER)
 			continue;
 		int cid = -1;
-		if (clients[id]->GetPosX() == m_PosX && clients[id]->GetPosY() + 1 == m_PosY) {
+		if (client->GetPosX() == m_PosX && client->GetPosY() + 1 == m_PosY) {
 			//아래있는 몬스터
 			cid = id;
 		}
-		else if (clients[id]->GetPosX() == m_PosX && clients[id]->GetPosY() - 1 == m_PosY) {
+		else if (client->GetPosX() == m_PosX && client->GetPosY() - 1 == m_PosY) {
 			//위에 있는 몬스터
 			cid = id;
 		}
-		else if (clients[id]->GetPosY() == m_PosY && clients[id]->GetPosX() + 1 == m_PosX) {
+		else if (client->GetPosY() == m_PosY && client->GetPosX() + 1 == m_PosX) {
 			//오른족에 있는 몬스터
 			cid = id;
 		}
-		else if (clients[id]->GetPosY() == m_PosY && clients[id]->GetPosX() - 1 == m_PosX) {
+		else if (client->GetPosY() == m_PosY && client->GetPosX() - 1 == m_PosX) {
 			//왼쪽에 있는 몬스터
 			cid = id;
 		}
@@ -621,56 +607,59 @@ void CPlayer::Attack()
 					m_power /= 2;
 				}
 			}
+			CObject* client2 = CNetworkMgr::GetInstance()->GetCObject(cid);
 
 			vector<int> see_monster;
-			for (auto& obj : clients) {
+			for (auto& obj : CNetworkMgr::GetInstance()->GetAllObject()) {
 				if (CL_STATE::ST_INGAME != obj->GetState())
 					continue;
 				if (obj->GetID() >= MAX_USER)
 					break;
-				if (true == obj->CanSee(clients[id]->GetID(), obj->GetID()))
+				if (true == obj->CanSee(CNetworkMgr::GetInstance()->GetCObject(id)->GetID()))
 					see_monster.emplace_back(obj->GetID());
 			}
 
-			clients[cid]->SetCurHp(clients[cid]->GetCurHp() - m_power * 2);
+			client2->SetCurHp(client2->GetCurHp() - m_power * 2);
 
 			bool remove = false;
 			int exp = 0;
-			if (clients[cid]->GetCurHp() <= 0.f) {
+			if (client2->GetCurHp() <= 0.f) {
 				remove = true;
-				dynamic_cast<CNpc*>(clients[cid])->SetDie(true);
-				timer_queue.push({cid, chrono::system_clock::now() + 30s, EV_MONSTER_RESPAWN, 0});
-				exp = clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2;
-				if (dynamic_cast<CNpc*>(clients[cid])->GetMonType() == MONSTER_TYPE::AGRO)
+				reinterpret_cast<CNpc*>(client2)->SetDie(true);
+				TIMER_EVENT ev = { cid, chrono::system_clock::now() + 30s, EV_MONSTER_RESPAWN, 0 };
+				CNetworkMgr::GetInstance()->RegisterEvent(ev);
+				exp = client2->GetLevel() * client2->GetLevel() * 2;
+				if (reinterpret_cast<CNpc*>(client2)->GetMonType() == MONSTER_TYPE::AGRO)
 					exp *= 2;
 				GainExp(exp);
 				Send_StatChange_Packet();
-				CreateItem(clients[cid]->GetPosX(), clients[cid]->GetPosY());
+				CreateItem(client2->GetPosX(), client2->GetPosY());
 			}
 
 			for (const auto id : see_monster) {
-				dynamic_cast<CPlayer*>(clients[id])->Send_Damage_Packet(cid, 3);
+				CPlayer* client3 = reinterpret_cast<CPlayer*>(CNetworkMgr::GetInstance()->GetCObject(id));
+				client3->Send_Damage_Packet(cid, 3);
 				if (true == remove) {
-					clients[id]->Send_RemoveObject_Packet(cid);
+					client3->Send_RemoveObject_Packet(cid);
 					char msg[CHAT_SIZE];
 					if (id == m_ID) {
-						sprintf_s(msg, CHAT_SIZE, "Obtained %dExp by killing %s", exp, clients[cid]->GetName());
-						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+						sprintf_s(msg, CHAT_SIZE, "Obtained %dExp by killing %s", exp, client2->GetName());
+						client3->Send_Chat_Packet(id, msg);
 					}
 					else {
-						sprintf_s(msg, CHAT_SIZE, "%s Killed %s", clients[id]->GetName(), clients[cid]->GetName());
-						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+						sprintf_s(msg, CHAT_SIZE, "%s Killed %s", client3->GetName(), client2->GetName());
+						client3->Send_Chat_Packet(id, msg);
 					}
 				}
 				else {
 					char msg[CHAT_SIZE];
 					if (id == m_ID) {
-						sprintf_s(msg, CHAT_SIZE, "Damaged %d at %s", clients[id]->GetPower() * 2, clients[cid]->GetName());
-						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+						sprintf_s(msg, CHAT_SIZE, "Damaged %d at %s", client3->GetPower() * 2, client2->GetName());
+						client3->Send_Chat_Packet(id, msg);
 					}
 					else {
-						sprintf_s(msg, CHAT_SIZE, "%s Damaged %d at %s", clients[id]->GetName(), clients[id]->GetPower() * 2, clients[cid]->GetName());
-						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+						sprintf_s(msg, CHAT_SIZE, "%s Damaged %d at %s", client3->GetName(), client3->GetPower() * 2, client2->GetName());
+						client3->Send_Chat_Packet(id, msg);
 					}
 				}
 			}
@@ -695,26 +684,27 @@ void CPlayer::Skill2()
 		if (id < MAX_USER)
 			continue;
 
+		CObject* client = CNetworkMgr::GetInstance()->GetCObject(id);
 		int cid = -1;
 		for (int i = 1; i < 5; ++i) {
 			switch (m_dir) {
 			case DIR::DOWN:
-				if (clients[id]->GetPosX() == m_PosX && clients[id]->GetPosY() - i == m_PosY) {
+				if (client->GetPosX() == m_PosX && client->GetPosY() - i == m_PosY) {
 					cid = id;
 				}
 				break;
 			case DIR::UP:
-				if (clients[id]->GetPosX() == m_PosX && clients[id]->GetPosY() + i == m_PosY) {
+				if (client->GetPosX() == m_PosX && client->GetPosY() + i == m_PosY) {
 					cid = id;
 				}
 				break;
 			case DIR::LEFT:
-				if (clients[id]->GetPosX() + i == m_PosX && clients[id]->GetPosY() == m_PosY) {
+				if (client->GetPosX() + i == m_PosX && client->GetPosY() == m_PosY) {
 					cid = id;
 				}
 				break;
 			case DIR::RIGHT:
-				if (clients[id]->GetPosX() - i == m_PosX && clients[id]->GetPosY() == m_PosY) {
+				if (client->GetPosX() - i == m_PosX && client->GetPosY() == m_PosY) {
 					cid = id;
 				}
 				break;
@@ -729,54 +719,58 @@ void CPlayer::Skill2()
 			}
 			
 			vector<int> see_monster;
-			for (auto& obj : clients) {
+			for (auto& obj : CNetworkMgr::GetInstance()->GetAllObject()) {
 				if (CL_STATE::ST_INGAME != obj->GetState())
 					continue;
 				if (obj->GetID() >= MAX_USER)
 					break;
-				if (true == obj->CanSee(clients[id]->GetID(), obj->GetID()))
+				if (true == obj->CanSee(client->GetID()))
 					see_monster.emplace_back(obj->GetID());
 			}
 
-			clients[cid]->SetCurHp(clients[cid]->GetCurHp() - m_power * 4);
+			CObject* target = CNetworkMgr::GetInstance()->GetCObject(cid);
+
+			target->SetCurHp(target->GetCurHp() - m_power * 4);
 
 			bool remove = false;
 			int exp = 0;
-			if (clients[cid]->GetCurHp() <= 0) {
+			if (target->GetCurHp() <= 0) {
 				remove = true;
-				dynamic_cast<CNpc*>(clients[cid])->SetDie(true);
-				timer_queue.push({ cid, chrono::system_clock::now() + 30s, EV_MONSTER_RESPAWN, 0 });
-				exp = clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2;
-				if (dynamic_cast<CNpc*>(clients[cid])->GetMonType() == MONSTER_TYPE::AGRO)
+				reinterpret_cast<CNpc*>(target)->SetDie(true);
+				TIMER_EVENT ev = { cid, chrono::system_clock::now() + 30s, EV_MONSTER_RESPAWN, 0 };
+				CNetworkMgr::GetInstance()->RegisterEvent(ev);
+				exp = target->GetLevel() * target->GetLevel() * 2;
+				if (reinterpret_cast<CNpc*>(target)->GetMonType() == MONSTER_TYPE::AGRO)
 					exp *= 2;
 				GainExp(exp);
 				Send_StatChange_Packet();
-				CreateItem(clients[cid]->GetPosX(), clients[cid]->GetPosY());
+				CreateItem(target->GetPosX(), target->GetPosY());
 			}
 
 			for (const auto id : see_monster) {
-				dynamic_cast<CPlayer*>(clients[id])->Send_Damage_Packet(cid, 3);
+				CPlayer* player = reinterpret_cast<CPlayer*>(CNetworkMgr::GetInstance()->GetCObject(id));
+				player->Send_Damage_Packet(cid, 3);
 				if (true == remove) {
-					clients[id]->Send_RemoveObject_Packet(cid);
+					player->Send_RemoveObject_Packet(cid);
 					char msg[CHAT_SIZE];
 					if (id == m_ID) {
-						sprintf_s(msg, CHAT_SIZE, "Obtained %dExp by killing %s", exp, clients[cid]->GetName());
-						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+						sprintf_s(msg, CHAT_SIZE, "Obtained %dExp by killing %s", exp, target->GetName());
+						player->Send_Chat_Packet(id, msg);
 					}
 					else {
-						sprintf_s(msg, CHAT_SIZE, "%s Killed %s", clients[id]->GetName(), clients[cid]->GetName());
-						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+						sprintf_s(msg, CHAT_SIZE, "%s Killed %s", player->GetName(), target->GetName());
+						player->Send_Chat_Packet(id, msg);
 					}
 				}
 				else {
 					char msg[CHAT_SIZE];
 					if (id == m_ID) {
-						sprintf_s(msg, CHAT_SIZE, "Damaged %d at %s", clients[id]->GetPower() * 4, clients[cid]->GetName());
-						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+						sprintf_s(msg, CHAT_SIZE, "Damaged %d at %s", player->GetPower() * 4, target->GetName());
+						player->Send_Chat_Packet(id, msg);
 					}
 					else {
-						sprintf_s(msg, CHAT_SIZE, "%s Damaged %d at %s", clients[id]->GetName(), clients[id]->GetPower() * 4, clients[cid]->GetName());
-						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+						sprintf_s(msg, CHAT_SIZE, "%s Damaged %d at %s", player->GetName(), player->GetPower() * 4, target->GetName());
+						player->Send_Chat_Packet(id, msg);
 					}
 				}
 			}
@@ -791,12 +785,13 @@ void CPlayer::Skill3()
 	m_ViewLock.unlock();
 
 	for (const auto id : v_list) {
+		CObject* client = CNetworkMgr::GetInstance()->GetCObject(id);
 		if (id < MAX_USER)
 			continue;
 		int cid = -1;
 		for (int i = -2; i < 3; ++i) {
 			for (int j = -2; j < 3; ++j) {
-				if (clients[id]->GetPosX() + i == m_PosX && clients[id]->GetPosY() + j == m_PosY) {
+				if (client->GetPosX() + i == m_PosX && client->GetPosY() + j == m_PosY) {
 					cid = id;
 					break;
 				}
@@ -812,53 +807,57 @@ void CPlayer::Skill3()
 				}
 			}
 			vector<int> see_monster;
-			for (auto& obj : clients) {
+			for (auto& obj : CNetworkMgr::GetInstance()->GetAllObject()) {
 				if (CL_STATE::ST_INGAME != obj->GetState())
 					continue;
 				if (obj->GetID() >= MAX_USER)
 					break;
-				if (true == obj->CanSee(clients[id]->GetID(), obj->GetID()))
+				if (true == obj->CanSee(client->GetID()))
 					see_monster.emplace_back(obj->GetID());
 			}
-			clients[cid]->SetCurHp(clients[cid]->GetCurHp() - m_power * 3);
+
+			CNpc* target = reinterpret_cast<CNpc*>(CNetworkMgr::GetInstance()->GetCObject(cid));
+			target->SetCurHp(target->GetCurHp() - m_power * 3);
 			
 			bool remove = false;
 			int exp = 0;
-			if (clients[cid]->GetCurHp() <= 0) {
+			if (target->GetCurHp() <= 0) {
 				remove = true;
-				dynamic_cast<CNpc*>(clients[cid])->SetDie(true);
-				timer_queue.push({ cid, chrono::system_clock::now() + 30s, EV_MONSTER_RESPAWN, 0 });
-				exp = clients[cid]->GetLevel() * clients[cid]->GetLevel() * 2;
-				if (dynamic_cast<CNpc*>(clients[cid])->GetMonType() == MONSTER_TYPE::AGRO)
+				target->SetDie(true);
+				TIMER_EVENT ev = { cid, chrono::system_clock::now() + 30s, EV_MONSTER_RESPAWN, 0 };
+				CNetworkMgr::GetInstance()->RegisterEvent(ev);
+				exp = target->GetLevel() * target->GetLevel() * 2;
+				if (target->GetMonType() == MONSTER_TYPE::AGRO)
 					exp *= 2;
 				GainExp(exp);
 				Send_StatChange_Packet();
-				CreateItem(clients[cid]->GetPosX(), clients[cid]->GetPosY());
+				CreateItem(target->GetPosX(), target->GetPosY());
 			}
 
 			for (const auto id : see_monster) {
-				dynamic_cast<CPlayer*>(clients[id])->Send_Damage_Packet(cid, 3);
+				CPlayer* player = reinterpret_cast<CPlayer*>(CNetworkMgr::GetInstance()->GetCObject(id));
+				player->Send_Damage_Packet(cid, 3);
 				if (true == remove) {
-					clients[id]->Send_RemoveObject_Packet(cid);
+					player->Send_RemoveObject_Packet(cid);
 					char msg[CHAT_SIZE];
 					if (id == m_ID) {
-						sprintf_s(msg, CHAT_SIZE, "Obtained %dExp by killing %s", exp, clients[cid]->GetName());
-						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+						sprintf_s(msg, CHAT_SIZE, "Obtained %dExp by killing %s", exp, target->GetName());
+						player->Send_Chat_Packet(id, msg);
 					}
 					else {
-						sprintf_s(msg, CHAT_SIZE, "%s Killed %s", clients[id]->GetName(), clients[cid]->GetName());
-						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+						sprintf_s(msg, CHAT_SIZE, "%s Killed %s", player->GetName(), target->GetName());
+						player->Send_Chat_Packet(id, msg);
 					}
 				}
 				else {
 					char msg[CHAT_SIZE];
 					if (id == m_ID) {
-						sprintf_s(msg, CHAT_SIZE, "Damaged %d at %s", clients[id]->GetPower() * 3, clients[cid]->GetName());
-						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+						sprintf_s(msg, CHAT_SIZE, "Damaged %d at %s", player->GetPower() * 3, target->GetName());
+						player->Send_Chat_Packet(id, msg);
 					}
 					else {
-						sprintf_s(msg, CHAT_SIZE, "%s Damaged %d at %s", clients[id]->GetName(), clients[id]->GetPower() * 3, clients[cid]->GetName());
-						dynamic_cast<CPlayer*>(clients[id])->Send_Chat_Packet(id, msg);
+						sprintf_s(msg, CHAT_SIZE, "%s Damaged %d at %s", player->GetName(), player->GetPower() * 3, target->GetName());
+						player->Send_Chat_Packet(id, msg);
 					}
 				}
 			}
@@ -926,7 +925,7 @@ void CPlayer::CreateItem(short x, short y)
 		p.x = x;
 		p.y = y;
 		p.item_type = static_cast<int>(item_type);
-		itemmap[y][x] = item_type;
+		GameUtil::SetItemTile(y, x, item_type);
 		SendPacket(&p);
 	}
 }
@@ -1054,8 +1053,8 @@ void CPlayer::Send_Damage_Packet(int cid, int powerlv)
 	p.size = sizeof(p);
 	p.type = SC_DAMAGE;
 	p.id = cid;
-	p.hp = clients[cid]->GetCurHp();
-
+	p.hp = CNetworkMgr::GetInstance()->GetCObject(cid)->GetCurHp();
+	
 	SendPacket(&p);
 }
 

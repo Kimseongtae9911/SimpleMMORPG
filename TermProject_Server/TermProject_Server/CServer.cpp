@@ -12,14 +12,18 @@ CServer::~CServer()
 
 bool CServer::Initialize()
 {
-	CNetworkMgr::GetInstance()->Initialize();
-
-    return false;
+	if (false == CNetworkMgr::GetInstance()->Initialize()) {
+		cout << "NetworkMgr Initialize Bug" << endl;
+		return false;
+	}
+	
+	cout << "Server Initialize Finish" << endl;
+	return true;
 }
 
 bool CServer::Release()
 {
-    return false;
+    return true;
 }
 
 void CServer::Run()
