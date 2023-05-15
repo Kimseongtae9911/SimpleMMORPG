@@ -33,9 +33,6 @@
     <ClInclude Include="protocol.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="LuaFunc.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="CDatabase.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
@@ -44,9 +41,6 @@
     </ClInclude>
     <ClInclude Include="CNetworkMgr.h">
       <Filter>소스 파일\Manager</Filter>
-    </ClInclude>
-    <ClInclude Include="OverExp.h">
-      <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="CObject.h">
       <Filter>소스 파일\Object</Filter>
@@ -60,12 +54,15 @@
     <ClInclude Include="CPacketMgr.h">
       <Filter>소스 파일\Manager</Filter>
     </ClInclude>
+    <ClInclude Include="OverExp.h">
+      <Filter>소스 파일\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="LuaFunc.h">
+      <Filter>소스 파일\Util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="LuaFunc.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="CDatabase.cpp">
@@ -76,9 +73,6 @@
     </ClCompile>
     <ClCompile Include="CNetworkMgr.cpp">
       <Filter>소스 파일\Manager</Filter>
-    </ClCompile>
-    <ClCompile Include="OverExp.cpp">
-      <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="CObject.cpp">
       <Filter>소스 파일\Object</Filter>
@@ -91,6 +85,12 @@
     </ClCompile>
     <ClCompile Include="CPacketMgr.cpp">
       <Filter>소스 파일\Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="OverExp.cpp">
+      <Filter>소스 파일\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="LuaFunc.cpp">
+      <Filter>소스 파일\Util</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

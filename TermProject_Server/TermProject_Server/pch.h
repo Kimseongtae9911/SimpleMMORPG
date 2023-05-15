@@ -6,6 +6,7 @@
 #include <MSWSock.h>
 #include <thread>
 #include <mutex>
+#include <shared_mutex>
 #include <array>
 #include <vector>
 #include <unordered_set>

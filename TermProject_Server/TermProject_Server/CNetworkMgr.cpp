@@ -331,9 +331,9 @@ void CNetworkMgr::Disconnect(int id)
 	ui.moneycnt = 78;
 	m_database->SavePlayerInfo(ui);
 
-	pc->m_ViewLock.lock();
+	pc->m_ViewLock.lock_shared();
 	unordered_set <int> vl = pc->GetViewList();
-	pc->m_ViewLock.unlock();
+	pc->m_ViewLock.unlock_shared();
 	for (auto& p_id : vl) {
 		if (id >= MAX_USER)
 			continue;

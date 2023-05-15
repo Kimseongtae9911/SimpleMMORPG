@@ -74,7 +74,7 @@ public:
 
 public:
 	mutex m_StateLock;
-	mutex m_ViewLock;
+	shared_mutex m_ViewLock;
 	int	last_move_time;
 
 protected:

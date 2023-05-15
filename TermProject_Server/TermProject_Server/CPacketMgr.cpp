@@ -218,9 +218,9 @@ void CPacketMgr::MovePacket(BASE_PACKET* packet, CPlayer* client)
 		client->CheckItem();
 
 		unordered_set<int> near_list;
-		client->m_ViewLock.lock();
+		client->m_ViewLock.lock_shared();
 		unordered_set<int> old_vlist = client->GetViewList();
-		client->m_ViewLock.unlock();
+		client->m_ViewLock.unlock_shared();
 		for (auto& cl : CNetworkMgr::GetInstance()->GetAllObject()) {
 			if (cl->GetState() != CL_STATE::ST_INGAME)
 				continue;
@@ -235,13 +235,13 @@ void CPacketMgr::MovePacket(BASE_PACKET* packet, CPlayer* client)
 		for (auto& pl : near_list) {
 			CObject* cpl = CNetworkMgr::GetInstance()->GetCObject(pl);
 			if (pl < MAX_USER) {
-				cpl->m_ViewLock.lock();
+				cpl->m_ViewLock.lock_shared();
 				if (cpl->GetViewList().count(client->GetID())) {
-					cpl->m_ViewLock.unlock();
+					cpl->m_ViewLock.unlock_shared();
 					cpl->Send_Move_Packet(client->GetID());
 				}
 				else {
-					cpl->m_ViewLock.unlock();
+					cpl->m_ViewLock.unlock_shared();
 					cpl->Send_AddObject_Packet(client->GetID());
 				}
 			}

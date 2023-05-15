@@ -228,13 +228,13 @@ void CNpc::Chase()
 
 	for (auto pl : old_vl) {
 		if (0 == new_vl.count(pl)) {
-			CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.lock();
+			CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.lock_shared();
 			if (0 != CNetworkMgr::GetInstance()->GetCObject(pl)->GetViewList().count(m_ID)) {
-				CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.unlock();
+				CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.unlock_shared();
 				CNetworkMgr::GetInstance()->GetCObject(pl)->Send_RemoveObject_Packet(m_ID);
 			}
 			else {
-				CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.unlock();
+				CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.unlock_shared();
 			}
 		}
 	}
@@ -289,13 +289,13 @@ void CNpc::RandomMove()
 
 	for (auto pl : old_vl) {
 		if (0 == new_vl.count(pl)) {
-			CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.lock();
+			CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.lock_shared();
 			if (0 != CNetworkMgr::GetInstance()->GetCObject(pl)->GetViewList().count(m_ID)) {
-				CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.unlock();
+				CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.unlock_shared();
 				CNetworkMgr::GetInstance()->GetCObject(pl)->Send_RemoveObject_Packet(m_ID);
 			}
 			else {
-				CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.unlock();
+				CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.unlock_shared();
 			}
 		}
 	}
@@ -575,9 +575,9 @@ void CPlayer::CheckItem()
 
 void CPlayer::Attack()
 {
-	m_ViewLock.lock();
+	m_ViewLock.lock_shared();
 	auto v_list = m_view_list;
-	m_ViewLock.unlock();
+	m_ViewLock.unlock_shared();
 
 	for (const auto id : v_list) {
 		CObject* client = CNetworkMgr::GetInstance()->GetCObject(id);
@@ -675,9 +675,9 @@ void CPlayer::Skill1()
 
 void CPlayer::Skill2()
 {
-	m_ViewLock.lock();
+	m_ViewLock.lock_shared();
 	auto v_list = m_view_list;
-	m_ViewLock.unlock();
+	m_ViewLock.unlock_shared();
 
 	//Collision
 	for (const auto id : v_list) {
@@ -780,9 +780,9 @@ void CPlayer::Skill2()
 
 void CPlayer::Skill3()
 {
-	m_ViewLock.lock();
+	m_ViewLock.lock_shared();
 	auto v_list = m_view_list;
-	m_ViewLock.unlock();
+	m_ViewLock.unlock_shared();
 
 	for (const auto id : v_list) {
 		CObject* client = CNetworkMgr::GetInstance()->GetCObject(id);
