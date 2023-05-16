@@ -55,6 +55,7 @@ public:
 	void SetMaxHp(int maxhp) { m_maxHp = maxhp; }
 	void SetCurHp(int curhp) { if (curhp > m_maxHp) { m_curHp = m_maxHp; } else { m_curHp = curhp; } }
 	void SetPower(int power) { m_power = power; }
+	void SetSection(int x, int y) { m_sectionX = x; m_sectionY = y; }
 
 	const CL_STATE GetState() const { return m_State; }
 	const int GetRemainBuf() const { return m_RemainBuf_Size; }
@@ -66,6 +67,8 @@ public:
 	const int GetID() const { return m_ID; }
 	const char* GetName() const { return m_Name; }
 	const int GetPower() const { return m_power; }
+	int GetSectionX() const { return m_sectionX; }
+	int GetSectionY() const { return m_sectionY; }
 
 	const unordered_set<int>& GetViewList() const {return m_view_list; }
 	const SOCKET& GetSocket() const { return m_Socket; }
@@ -93,6 +96,9 @@ protected:
 	int m_maxHp;
 	int m_curHp;
 	int m_power;
+
+	int m_sectionX = 0;
+	int m_sectionY = 0;
 
 private:
 	OVER_EXP m_RecvOver;

@@ -10,6 +10,9 @@ std::unique_ptr<CNetworkMgr> CNetworkMgr::m_instance;
 bool CNetworkMgr::Initialize()
 {
 	try {
+		WSADATA WSAData;
+		WSAStartup(MAKEWORD(2, 2), &WSAData);
+
 		m_iocpfunc.insert({ OP_TYPE::OP_ACCEPT, [this](int id, int bytes, OVER_EXP* over_ex) {Accept(id, bytes, over_ex); } });
 		m_iocpfunc.insert({ OP_TYPE::OP_MONSTER_RESPAWN, [this](int id, int bytes, OVER_EXP* over_ex) {MonsterRespawn(id, bytes, over_ex); } });
 		m_iocpfunc.insert({ OP_TYPE::OP_NPC_MOVE, [this](int id, int bytes, OVER_EXP* over_ex) {NpcMove(id, bytes, over_ex); } });
@@ -18,8 +21,12 @@ bool CNetworkMgr::Initialize()
 		m_iocpfunc.insert({ OP_TYPE::OP_SEND, [this](int id, int bytes, OVER_EXP* over_ex) {Send(id, bytes, over_ex); } });
 
 		m_over = new OVER_EXP;
+#ifdef DATABASE
 		m_database = new CDatabase();
 		m_database->Initialize();
+#else
+		cout << "Execute without database" << endl;
+#endif
 		CPacketMgr::GetInstance()->Initialize();
 		GameUtil::InitailzeData();
 
@@ -39,13 +46,21 @@ bool CNetworkMgr::Initialize()
 
 		for (int i = 0; i < MAX_USER; ++i) {
 			SOCKET s = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+			if (s == INVALID_SOCKET) {
+				cout << i << ", Failed to Create Socket" << endl;
+			}
 			m_socketpool.push(s);
 			m_idMap.insert({s, i});
 		}
 
-		WSADATA WSAData;
-		WSAStartup(MAKEWORD(2, 2), &WSAData);
 		m_listenSock = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+
+		m_iocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0);
+		if (m_iocp == NULL) {
+			cout << "Failed to make HANDLE" << endl;
+		}
+		CreateIoCompletionPort(reinterpret_cast<HANDLE>(m_listenSock), m_iocp, 9999, 0);
+
 		SOCKADDR_IN server_addr;
 		memset(&server_addr, 0, sizeof(server_addr));
 		server_addr.sin_family = AF_INET;
@@ -55,18 +70,20 @@ bool CNetworkMgr::Initialize()
 		if (ret != 0) {
 			cout << "Bind Error" << endl;
 		}
-		listen(m_listenSock, SOMAXCONN);
-		SOCKADDR_IN cl_addr;
-		int addr_size = sizeof(cl_addr);
-
-		m_iocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0);
-		CreateIoCompletionPort(reinterpret_cast<HANDLE>(m_listenSock), m_iocp, 9999, 0);
+		ret = listen(m_listenSock, SOMAXCONN);
+		if (ret != 0) {
+			cout << "Listen Error" << endl;
+		}
 
 		m_clientSock = m_socketpool.front();
 		m_socketpool.pop();
 
+		SOCKADDR_IN cl_addr;
+		int addr_size = sizeof(cl_addr);
+
 		m_over->m_comp_type = OP_TYPE::OP_ACCEPT;
 		AcceptEx(m_listenSock, m_clientSock, m_over->m_send_buf, 0, addr_size + 16, addr_size + 16, 0, &m_over->m_over);
+		
 		return true;
 	}
 	catch (exception ex) {
@@ -311,7 +328,10 @@ void CNetworkMgr::Disconnect(int id)
 	ui.item5 = pc->GetItemType(4) - 1;
 	ui.item6 = pc->GetItemType(5) - 1;
 	ui.moneycnt = 78;
+
+#ifdef DATABASE
 	m_database->SavePlayerInfo(ui);
+#endif
 
 	pc->m_ViewLock.lock_shared();
 	unordered_set <int> vl = pc->GetViewList();

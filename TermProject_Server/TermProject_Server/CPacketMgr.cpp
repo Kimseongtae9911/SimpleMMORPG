@@ -46,8 +46,11 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CPlayer* client)
 	CS_LOGIN_PACKET* p = reinterpret_cast<CS_LOGIN_PACKET*>(packet);
 
 	if (strcmp(p->name, "Stress_Test")) {
+#ifdef DATABASE
 		USER_INFO* user_info = reinterpret_cast<USER_INFO*>(CNetworkMgr::GetInstance()->GetDatabase()->GetPlayerInfo(p->name));
-
+#else
+		USER_INFO* user_info = new USER_INFO{ 100, 100, 50, 50, 1, 0, 30, 30, "KST", -1, -1, -1, -1, -1, -1, 0 };
+#endif
 		if (user_info->max_hp == -1) {
 			CNetworkMgr::GetInstance()->GetDatabase()->MakeNewInfo(p->name);
 		}
@@ -110,7 +113,7 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CPlayer* client)
 					p.y = client->GetPosY();
 					client->SendPacket(&p);
 				}
-				if (user_info->item3 != 3) {
+				if (user_info->item3 != -1) {
 					client->SetItem(2, static_cast<ITEM_TYPE>(user_info->item3 + 1), 0, true);
 					SC_ITEM_GET_PACKET p;
 					p.size = sizeof(p);
@@ -154,6 +157,10 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CPlayer* client)
 					p.y = client->GetPosY();
 					client->SendPacket(&p);
 				}
+				int sectionX = client->GetPosX() / SECTION_SIZE;
+				int sectionY = client->GetPosY() / SECTION_SIZE;
+				client->SetSection(sectionX, sectionY);
+				GameUtil::RegisterToSection(sectionX, sectionY, client->GetID());
 			}
 		}
 	}

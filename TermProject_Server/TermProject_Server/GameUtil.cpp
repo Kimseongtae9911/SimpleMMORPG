@@ -3,6 +3,7 @@
 
 char GameUtil::tilemap[W_HEIGHT][W_WIDTH];
 ITEM_TYPE GameUtil::itemmap[W_HEIGHT][W_WIDTH] = { NONE, };
+array<array<Section, SECTION_NUM>, SECTION_NUM> GameUtil::sections;
 
 bool GameUtil::InitailzeData()
 {
