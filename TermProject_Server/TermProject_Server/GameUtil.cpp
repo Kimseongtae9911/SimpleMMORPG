@@ -83,3 +83,12 @@ bool GameUtil::CanMove(short x, short y, char dir)
 	return canmove;
 
 }
+
+vector<int>& GameUtil::GetSectionObjects(int x, int y)
+{
+	sections[x][y].sectionLock.lock_shared();
+	vector<int> objects(sections[x][y].objects);
+	sections[x][y].sectionLock.unlock_shared();
+
+	return objects;
+}

@@ -1011,6 +1011,29 @@ bool CPlayer::CanUse(char skill, chrono::system_clock::time_point time)
 
 }
 
+void CPlayer::Heal()
+{
+	bool heal = false;
+	if (m_curHp < m_maxHp) {
+		SetCurHp(m_curHp + static_cast<int>(m_maxHp * 0.1f));
+		heal = true;
+	}
+	if (m_curMp < m_maxMp) {
+		SetMp(m_curMp + static_cast<int>(m_maxMp * 0.1f));
+		heal = true;
+	}
+
+	if (true == heal)
+		Send_StatChange_Packet();
+	if ((m_curHp < m_maxHp) || (m_curMp < m_maxMp)) {
+		TIMER_EVENT ev{ m_ID, chrono::system_clock::now() + 5s, EV_PLAYER_HEAL, 0 };
+		CNetworkMgr::GetInstance()->RegisterEvent(ev);
+	}
+	else {
+		m_heal = false;
+	}
+}
+
 void CPlayer::Send_LoginInfo_Packet()
 {
 	SC_LOGIN_INFO_PACKET p;

@@ -28,6 +28,7 @@ int API_Initialize(lua_State* L)
 			break;
 	}
 	npc->SetRespawnPos(npc->GetPosX(), npc->GetPosY());
+	GameUtil::RegisterToSection(npc->GetPosX() / SECTION_SIZE, npc->GetPosY() / SECTION_SIZE, id);
 	int n = rand() % 5;
 	int level = (npc->GetPosX() / 100) * 5 + (npc->GetPosY() / 100) * 5 + n;
 	npc->SetLevel(level + 5);

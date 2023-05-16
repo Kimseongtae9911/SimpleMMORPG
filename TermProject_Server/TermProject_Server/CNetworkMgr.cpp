@@ -38,7 +38,9 @@ bool CNetworkMgr::Initialize()
 
 
 		for (int i = 0; i < MAX_USER; ++i) {
-			m_socketpool.push(WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED));
+			SOCKET s = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+			m_socketpool.push(s);
+			m_idMap.insert({s, i});
 		}
 
 		WSADATA WSAData;
@@ -154,21 +156,26 @@ void CNetworkMgr::TimerFunc()
 
 void CNetworkMgr::Accept(int id, int bytes, OVER_EXP* over_ex)
 {
-	int client_id = GetNewID();
-	if (client_id != -1) {
-		{
-			lock_guard<mutex> ll(m_objects[client_id]->m_StateLock);
-			m_objects[client_id]->SetState(CL_STATE::ST_ALLOC);
-		}
-		CreateIoCompletionPort(reinterpret_cast<HANDLE>(m_clientSock), m_iocp, client_id, 0);
-		reinterpret_cast<CPlayer*>(m_objects[client_id])->PlayerAccept(client_id, m_clientSock);
+	if (m_clientSock == -1) {
+		return;
+	}
+	int client_id = m_idMap.find(m_clientSock)->second;
+	{
+		lock_guard<mutex> ll(m_objects[client_id]->m_StateLock);
+		m_objects[client_id]->SetState(CL_STATE::ST_ALLOC);
+	}
+	CreateIoCompletionPort(reinterpret_cast<HANDLE>(m_clientSock), m_iocp, client_id, 0);
+	reinterpret_cast<CPlayer*>(m_objects[client_id])->PlayerAccept(client_id, m_clientSock);
 
+	if (!m_socketpool.empty()) {
 		m_clientSock = m_socketpool.front();
 		m_socketpool.pop();
 	}
 	else {
 		cout << "Max user exceeded.\n";
+		m_clientSock = -1;
 	}
+
 	ZeroMemory(&m_over->m_over, sizeof(m_over->m_over));
 	int addr_size = sizeof(SOCKADDR_IN);
 	AcceptEx(m_listenSock, m_clientSock, m_over->m_send_buf, 0, addr_size + 16, addr_size + 16, 0, &m_over->m_over);
@@ -192,32 +199,7 @@ void CNetworkMgr::MonsterRespawn(int id, int bytes, OVER_EXP* over_ex)
 
 void CNetworkMgr::PlayerHeal(int id, int bytes, OVER_EXP* over_ex)
 {
-	CPlayer* player = reinterpret_cast<CPlayer*>(m_objects[id]);
-	bool heal = false;
-	if (player->GetCurHp() < player->GetMaxHp()) {
-		player->SetCurHp(player->GetCurHp() + static_cast<int>(player->GetMaxHp() * 0.1f));
-		if (player->GetCurHp() > player->GetMaxHp()) {
-			player->SetCurHp(player->GetMaxHp());
-		}
-		heal = true;
-	}
-	if (player->GetMp() < player->GetMaxMp()) {
-		player->SetMp(player->GetMp() + static_cast<int>(player->GetMaxMp() * 0.1f));
-		if (player->GetMp() > player->GetMaxMp()) {
-			player->SetMp(player->GetMaxMp());
-		}
-		heal = true;
-	}
-
-	if (true == heal)
-		player->Send_StatChange_Packet();
-	if (player->GetCurHp() < player->GetMaxHp()) {
-		TIMER_EVENT ev{ id, chrono::system_clock::now() + 5s, EV_PLAYER_HEAL, 0 };
-		m_timerQueue.push(ev);
-	}
-	else {
-		player->SetHeal(false);
-	}
+	reinterpret_cast<CPlayer*>(m_objects[id])->Heal();
 }
 
 void CNetworkMgr::NpcMove(int id, int bytes, OVER_EXP* over_ex)

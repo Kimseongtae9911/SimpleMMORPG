@@ -53,7 +53,7 @@ public:
 	void SetPos(const short x, const short y) { m_PosX = x; m_PosY = y; }
 	void SetLevel(int level) { m_level = level; }
 	void SetMaxHp(int maxhp) { m_maxHp = maxhp; }
-	void SetCurHp(int curhp) { m_curHp = curhp; }
+	void SetCurHp(int curhp) { if (curhp > m_maxHp) { m_curHp = m_maxHp; } else { m_curHp = curhp; } }
 	void SetPower(int power) { m_power = power; }
 
 	const CL_STATE GetState() const { return m_State; }
@@ -156,7 +156,7 @@ public:
 	void SetExp(const int exp) { m_exp = exp; }
 	void SetMaxExp(const int exp) { m_maxExp = exp; }
 	void SetMaxMp(const int mp) { m_maxMp = mp; }
-	void SetMp(const int mp) { m_curMp = mp; }
+	void SetMp(const int mp) { if (mp > m_maxMp) { m_curMp = m_maxMp; } else { m_curMp = mp; } }
 	void SetUsedTime(const int index, const chrono::system_clock::time_point time) { m_usedTime[index] = time; }
 	void SetDir(DIR dir) { m_dir = dir; }
 	void SetPowerUp(bool power) { m_powerup = power; }
@@ -188,6 +188,8 @@ public:
 	bool GetHeal() const { return m_heal; }
 	void SetHeal(bool heal) { m_heal = heal; }
 	bool CanUse(char skill, chrono::system_clock::time_point time);
+
+	void Heal();
 
 public:
 	mutex m_itemLock;
