@@ -31,7 +31,7 @@ int API_Initialize(lua_State* L)
 	int sectionX = static_cast<int>(npc->GetPosX() / SECTION_SIZE);
 	int sectionY = static_cast<int>(npc->GetPosY() / SECTION_SIZE);
 	npc->SetSection(sectionX, sectionY);
-	GameUtil::RegisterToSection(sectionX, sectionY, id);
+	GameUtil::RegisterToSection(sectionY, sectionX, id);
 	int n = rand() % 5;
 	int level = (npc->GetPosX() / 100) * 5 + (npc->GetPosY() / 100) * 5 + n;
 	npc->SetLevel(level + 5);

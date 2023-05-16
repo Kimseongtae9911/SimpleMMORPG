@@ -119,6 +119,7 @@ const bool CObject::CanSee(int to) const
 	return abs(GetPosY() - CNetworkMgr::GetInstance()->GetCObject(to)->GetPosY()) <= VIEW_RANGE;
 }
 
+
 CNpc::CNpc(int id)
 {
 	m_ID = id;
@@ -242,15 +243,9 @@ void CNpc::Chase()
 
 void CNpc::RandomMove()
 {	
-	unordered_set<int> old_vl;
-	for (auto& obj : CNetworkMgr::GetInstance()->GetAllObject()) {
-		if (CL_STATE::ST_INGAME != obj->GetState())
-			continue;
-		if (obj->GetID() >= MAX_USER)
-			continue;
-		if (true == CanSee(obj->GetID()))
-			old_vl.insert(obj->GetID());
-	}
+	m_ViewLock.lock_shared();
+	unordered_set<int> old_vl = m_view_list;
+	m_ViewLock.unlock_shared();
 
 	int x = m_PosX;
 	int y = m_PosY;
@@ -263,23 +258,25 @@ void CNpc::RandomMove()
 		case 3:	x++; break;
 		}
 		SetPos(x, y);
+		int sectionX = static_cast<int>(x / SECTION_SIZE);
+		int sectionY = static_cast<int>(y / SECTION_SIZE);
+		if (m_sectionX != sectionX || m_sectionY != sectionY) {
+			GameUtil::RegisterToSection(sectionY, sectionX, m_ID);
+			m_sectionX = sectionX;
+			m_sectionY = sectionY;
+		}
 	}
 
 	// 움직인 이후에 해당 NPC가 시야에 있는 플레이어들
-	unordered_set<int> new_vl;
-	for (auto& obj : CNetworkMgr::GetInstance()->GetAllObject()) {
-		if (CL_STATE::ST_INGAME != obj->GetState())
-			continue;
-		if (obj->GetID() >= MAX_USER)
-			continue;
-		if (true == CanSee(obj->GetID()))
-			new_vl.insert(obj->GetID());
-	}
+	unordered_set<int> new_vl = CheckSection();
 
 	for (auto pl : new_vl) {
 		// new_vl에는 있는데 old_vl에는 없을 때 플레이어의 시야에 등장
 		if (0 == old_vl.count(pl)) {
 			CNetworkMgr::GetInstance()->GetCObject(pl)->Send_AddObject_Packet(m_ID);
+			m_ViewLock.lock();
+			m_view_list.insert(pl);
+			m_ViewLock.unlock();
 		}
 		else {
 			// 플레이어가 계속 보고 있음.
@@ -293,6 +290,9 @@ void CNpc::RandomMove()
 			if (0 != CNetworkMgr::GetInstance()->GetCObject(pl)->GetViewList().count(m_ID)) {
 				CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.unlock_shared();
 				CNetworkMgr::GetInstance()->GetCObject(pl)->Send_RemoveObject_Packet(m_ID);
+				m_ViewLock.lock();
+				m_view_list.erase(pl);
+				m_ViewLock.unlock();
 			}
 			else {
 				CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.unlock_shared();
@@ -316,13 +316,115 @@ void CNpc::WakeUp(int waker)
 	//exover->m_ai_target_obj = waker;
 	//PostQueuedCompletionStatus(h_iocp, 1, npc_id, &exover->m_over);
 
+	m_ViewLock.lock();
+	m_view_list.insert(waker);
+	m_ViewLock.unlock();
+
 	if (m_active)
 		return;
+
 	bool old_state = false;
 	if (false == atomic_compare_exchange_strong(&m_active, &old_state, true))
 		return;
 	TIMER_EVENT ev{ m_ID, chrono::system_clock::now(), EV_RANDOM_MOVE, 0 };	
 	CNetworkMgr::GetInstance()->RegisterEvent(ev);
+}
+
+unordered_set<int> CNpc::CheckSection()
+{
+	unordered_set<int> viewList;
+	//Center
+	for (int id : GameUtil::GetSectionObjects(m_sectionY, m_sectionX)) {
+		if (id >= MAX_USER || id == m_ID)
+			continue;
+		if (true == CanSee(id))
+			viewList.insert(id);
+	}
+
+	//Right
+	if (m_PosX % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionX != SECTION_NUM - 1) {
+		for (int id : GameUtil::GetSectionObjects(m_sectionY, m_sectionX + 1)) {
+			if (id >= MAX_USER || id == m_ID)
+				continue;
+			if (true == CanSee(id))
+				viewList.insert(id);
+		}
+
+		//RightDown
+		if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1) {
+			for (int id : GameUtil::GetSectionObjects(m_sectionY + 1, m_sectionX + 1)) {
+				if (id >= MAX_USER || id == m_ID)
+					continue;
+				if (true == CanSee(id))
+					viewList.insert(id);
+			}
+		}
+		//RightUp
+		else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0) {
+			for (int id : GameUtil::GetSectionObjects(m_sectionY - 1, m_sectionX + 1)) {
+				if (id >= MAX_USER || id == m_ID)
+					continue;
+				if (true == CanSee(id))
+					viewList.insert(id);
+			}
+		}
+
+	}
+	//Left
+	else if (m_PosX % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionX != 0) {
+		for (int id : GameUtil::GetSectionObjects(m_sectionY, m_sectionX - 1)) {
+			if (id >= MAX_USER || id == m_ID)
+				continue;
+			if (true == CanSee(id))
+				viewList.insert(id);
+		}
+		//LeftDown
+		if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1) {
+			for (int id : GameUtil::GetSectionObjects(m_sectionY + 1, m_sectionX - 1)) {
+				if (id >= MAX_USER || id == m_ID)
+					continue;
+				if (true == CanSee(id))
+					viewList.insert(id);
+			}
+		}
+		//LeftUp
+		else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0) {
+			for (int id : GameUtil::GetSectionObjects(m_sectionY - 1, m_sectionX - 1)) {
+				if (id >= MAX_USER || id == m_ID)
+					continue;
+				if (true == CanSee(id))
+					viewList.insert(id);
+			}
+		}
+	}
+
+	//Down
+	if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1) {
+		for (int id : GameUtil::GetSectionObjects(m_sectionY + 1, m_sectionX)) {
+			if (id >= MAX_USER || id == m_ID)
+				continue;
+			if (true == CanSee(id))
+				viewList.insert(id);
+		}
+	}
+	//Up
+	else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0) {
+		for (int id : GameUtil::GetSectionObjects(m_sectionY - 1, m_sectionX)) {
+			if (id >= MAX_USER || id == m_ID)
+				continue;
+			if (true == CanSee(id))
+				viewList.insert(id);
+		}
+	}
+
+	return viewList;
+}
+
+void CNpc::RemoveClient(int id)
+{
+	m_ViewLock.lock();
+	m_view_list.erase(id);
+	m_ViewLock.unlock();
 }
 
 bool CNpc::AStar(int startX, int startY, int destX, int destY, int* resultx, int* resulty)
@@ -334,26 +436,43 @@ bool CNpc::AStar(int startX, int startY, int destX, int destY, int* resultx, int
 	if (!IsUnBlocked(startX, startY) || !IsUnBlocked(destX, destY)) return false;
 	if (IsDest(startX, startY, destX, destY)) return false;
 
-	bool** closedList = new bool* [W_HEIGHT];
-	for (int i = 0; i < W_HEIGHT; ++i) {
-		closedList[i] = new bool[W_WIDTH];
+	/*bool** closedList = new bool* [MONSTER_VIEW];
+	for (int i = 0; i < MONSTER_VIEW; ++i) {
+		closedList[i] = new bool[MONSTER_VIEW];
 
-		for (int j = 0; j < W_WIDTH; ++j) {
+		for (int j = 0; j < MONSTER_VIEW; ++j) {
+			closedList[i][j] = false;
+		}
+	}*/
+
+
+	bool closedList[MONSTER_VIEW * 2 + 1][MONSTER_VIEW * 2 + 1] = {};
+
+	for (int i = 0; i < MONSTER_VIEW; ++i) {
+		for (int j = 0; j < MONSTER_VIEW; ++j) {
 			closedList[i][j] = false;
 		}
 	}
+	/*Node** node = new Node * [MONSTER_VIEW];
+	for (int i = 0; i < MONSTER_VIEW; ++i) {
+		node[i] = new Node[MONSTER_VIEW];
+	}*/
+	Node node[MONSTER_VIEW * 2 + 1][MONSTER_VIEW * 2 + 1] = {};
 
-	Node** node = new Node * [W_HEIGHT];
-	for (int i = 0; i < W_HEIGHT; ++i) {
-		node[i] = new Node[W_WIDTH];
-	}
-
-	for (int i = 0; i < W_HEIGHT; ++i) {
-		for (int j = 0; j < W_WIDTH; ++j) {
+	for (int i = 0; i < MONSTER_VIEW * 2 + 1; ++i) {
+		for (int j = 0; j < MONSTER_VIEW * 2 + 1; ++j) {
 			node[i][j].f = node[i][j].g = node[i][j].h = INF;
 			node[i][j].parentX = node[i][j].parentY = -1;
 		}
 	}
+
+	int offsetX = startX;
+	int offsetY = startY;
+	destX = MONSTER_VIEW + (destX - startX);
+	destY = MONSTER_VIEW + (destY - startY);
+	startX = MONSTER_VIEW;
+	startY = MONSTER_VIEW;
+	
 
 	node[startY][startX].f = node[startY][startX].g = node[startY][startX].h = 0.f;
 	node[startY][startX].parentX = startX;
@@ -386,10 +505,12 @@ bool CNpc::AStar(int startX, int startY, int destX, int destY, int* resultx, int
 					node[ny][nx].parentX = x;
 					node[ny][nx].parentY = y;
 					FindPath(node, destX, destY, resultx, resulty);
-					for (int i = 0; i < W_HEIGHT; ++i) {
-						delete[] closedList[i];
+					/*for (int j = 0; j < MONSTER_VIEW; ++j) {
+						delete[] closedList[j];
 					}
-					delete[] closedList;
+					delete[] closedList;*/
+					*resultx += (offsetX - MONSTER_VIEW);
+					*resulty += (offsetY - MONSTER_VIEW);					
 					return true;
 				}
 				else if (!closedList[ny][nx] && IsUnBlocked(nx, ny)) {
@@ -441,7 +562,7 @@ double CNpc::CalH(int x, int y, int destX, int destY)
 	return (abs(x - destX) + abs(y - destY));
 }
 
-void CNpc::FindPath(Node* node[], int destX, int destY, int* x, int* y)
+void CNpc::FindPath(Node node[MONSTER_VIEW * 2 + 1][MONSTER_VIEW * 2 + 1], int destX, int destY, int* x, int* y)
 {
 	stack<Node> s;
 	s.push({ destX, destY });
@@ -457,10 +578,9 @@ void CNpc::FindPath(Node* node[], int destX, int destY, int* x, int* y)
 	*x = s.top().parentX;
 	*y = s.top().parentY;
 
-	for (int i = 0; i < W_HEIGHT; ++i)
+	/*for (int i = 0; i < W_HEIGHT; ++i)
 		delete[] node[i];
-
-	delete[] node;
+	delete[] node;*/
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1032,6 +1152,96 @@ void CPlayer::Heal()
 	else {
 		m_heal = false;
 	}
+}
+
+unordered_set<int> CPlayer::CheckSection()
+{
+	unordered_set<int> viewList;
+	//Center
+	for (int id : GameUtil::GetSectionObjects(m_sectionY, m_sectionX)) {
+		if (id == m_ID)
+			continue;
+		if (true == CanSee(id))
+			viewList.insert(id);
+	}
+
+	//Right
+	if (m_PosX % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionX != SECTION_NUM - 1) {
+		for (int id : GameUtil::GetSectionObjects(m_sectionY, m_sectionX + 1)) {
+			if (id == m_ID)
+				continue;
+			if (true == CanSee(id))
+				viewList.insert(id);
+		}
+
+		//RightDown
+		if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1) {
+			for (int id : GameUtil::GetSectionObjects(m_sectionY + 1, m_sectionX + 1)) {
+				if (id == m_ID)
+					continue;
+				if (true == CanSee(id))
+					viewList.insert(id);
+			}
+		}
+		//RightUp
+		else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0) {
+			for (int id : GameUtil::GetSectionObjects(m_sectionY - 1, m_sectionX + 1)) {
+				if (id == m_ID)
+					continue;
+				if (true == CanSee(id))
+					viewList.insert(id);
+			}
+		}
+
+	}
+	//Left
+	else if (m_PosX % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionX != 0) {
+		for (int id : GameUtil::GetSectionObjects(m_sectionY, m_sectionX - 1)) {
+			if (id == m_ID)
+				continue;
+			if (true == CanSee(id))
+				viewList.insert(id);
+		}
+		//LeftDown
+		if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1) {
+			for (int id : GameUtil::GetSectionObjects(m_sectionY + 1, m_sectionX - 1)) {
+				if (id == m_ID)
+					continue;
+				if (true == CanSee(id))
+					viewList.insert(id);
+			}
+		}
+		//LeftUp
+		else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0) {
+			for (int id : GameUtil::GetSectionObjects(m_sectionY - 1, m_sectionX - 1)) {
+				if (id == m_ID)
+					continue;
+				if (true == CanSee(id))
+					viewList.insert(id);
+			}
+		}
+	}
+
+	//Down
+	if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1) {
+		for (int id : GameUtil::GetSectionObjects(m_sectionY + 1, m_sectionX)) {
+			if (id == m_ID)
+				continue;
+			if (true == CanSee(id))
+				viewList.insert(id);
+		}
+	}
+	//Up
+	else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0) {
+		for (int id : GameUtil::GetSectionObjects(m_sectionY - 1, m_sectionX)) {
+			if (id == m_ID)
+				continue;
+			if (true == CanSee(id))
+				viewList.insert(id);
+		}
+	}
+
+	return viewList;
 }
 
 void CPlayer::Send_LoginInfo_Packet()

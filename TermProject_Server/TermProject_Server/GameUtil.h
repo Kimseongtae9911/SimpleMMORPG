@@ -19,8 +19,8 @@ public:
 	static ITEM_TYPE GetItemTile(int x, int y) { return itemmap[x][y]; }
 	static void SetItemTile(int x, int y, ITEM_TYPE item) { itemmap[x][y] = item; }
 
-	static vector<int>& GetSectionObjects(int x, int y);
-	static void RegisterToSection(int x, int y, int id) { sections[x][y].sectionLock.lock_shared(); sections[x][y].objects.push_back(id); sections[x][y].sectionLock.unlock_shared();}
+	static vector<int> GetSectionObjects(int x, int y);
+	static void RegisterToSection(int x, int y, int id) { sections[x][y].sectionLock.lock(); sections[x][y].objects.push_back(id); sections[x][y].sectionLock.unlock();}
 
 private:
 	static char tilemap[W_HEIGHT][W_WIDTH];

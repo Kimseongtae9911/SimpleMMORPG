@@ -85,7 +85,7 @@ bool GameUtil::CanMove(short x, short y, char dir)
 
 }
 
-vector<int>& GameUtil::GetSectionObjects(int x, int y)
+vector<int> GameUtil::GetSectionObjects(int x, int y)
 {
 	sections[x][y].sectionLock.lock_shared();
 	vector<int> objects(sections[x][y].objects);

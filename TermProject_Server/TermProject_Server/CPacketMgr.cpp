@@ -160,7 +160,7 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CPlayer* client)
 				int sectionX = client->GetPosX() / SECTION_SIZE;
 				int sectionY = client->GetPosY() / SECTION_SIZE;
 				client->SetSection(sectionX, sectionY);
-				GameUtil::RegisterToSection(sectionX, sectionY, client->GetID());
+				GameUtil::RegisterToSection(sectionY, sectionX, client->GetID());
 			}
 		}
 	}
@@ -223,19 +223,16 @@ void CPacketMgr::MovePacket(BASE_PACKET* packet, CPlayer* client)
 		}
 		client->SetPos(x, y);
 		client->CheckItem();
+		int sectionX = static_cast<int>(x / SECTION_SIZE);
+		int sectionY = static_cast<int>(y / SECTION_SIZE);
+		client->SetSection(sectionX, sectionY);
+		GameUtil::RegisterToSection(sectionY, sectionX, client->GetID());
 
-		unordered_set<int> near_list;
 		client->m_ViewLock.lock_shared();
 		unordered_set<int> old_vlist = client->GetViewList();
 		client->m_ViewLock.unlock_shared();
-		for (auto& cl : CNetworkMgr::GetInstance()->GetAllObject()) {
-			if (cl->GetState() != CL_STATE::ST_INGAME)
-				continue;
-			if (cl->GetID() == client->GetID())
-				continue;
-			if (client->CanSee(cl->GetID()))
-				near_list.insert(cl->GetID());
-		}
+
+		unordered_set<int> near_list = client->CheckSection();
 
 		client->Send_Move_Packet(client->GetID());
 
@@ -265,6 +262,9 @@ void CPacketMgr::MovePacket(BASE_PACKET* packet, CPlayer* client)
 				client->Send_RemoveObject_Packet(pl);
 				if (pl < MAX_USER)
 					CNetworkMgr::GetInstance()->GetCObject(pl)->Send_RemoveObject_Packet(client->GetID());
+				else {
+					reinterpret_cast<CNpc*>(CNetworkMgr::GetInstance()->GetCObject(pl))->RemoveClient(client->GetID());
+				}
 			}
 		}
 	}

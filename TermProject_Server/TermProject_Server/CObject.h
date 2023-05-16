@@ -74,6 +74,8 @@ public:
 	const SOCKET& GetSocket() const { return m_Socket; }
 
 	const bool CanSee(int to) const;
+	
+	virtual unordered_set<int> CheckSection() { return {}; }
 
 public:
 	mutex m_StateLock;
@@ -131,13 +133,16 @@ public:
 	bool Agro(int to);
 	void WakeUp(int waker);
 
+	virtual unordered_set<int> CheckSection();
+	void RemoveClient(int id);
+
 private:
 	bool AStar(int startX, int startY, int destX, int destY, int* resultx, int* resulty);
 	bool IsDest(int startX, int startY, int destX, int destY);
 	bool IsValid(int x, int y);
 	bool IsUnBlocked(int x, int y);
 	double CalH(int x, int y, int destX, int destY);
-	void FindPath(Node* node[], int destX, int destY, int* x, int* y);
+	void FindPath(Node node[MONSTER_VIEW * 2 + 1][MONSTER_VIEW * 2 + 1], int destX, int destY, int* x, int* y);
 
 public:
 	atomic_bool	m_active;
@@ -196,6 +201,8 @@ public:
 	bool CanUse(char skill, chrono::system_clock::time_point time);
 
 	void Heal();
+
+	virtual unordered_set<int> CheckSection();
 
 public:
 	mutex m_itemLock;
