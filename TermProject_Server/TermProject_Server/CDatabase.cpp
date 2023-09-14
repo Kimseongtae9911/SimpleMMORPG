@@ -20,6 +20,12 @@ bool CDatabase::Initialize()
 
 	SQLRETURN retcode = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &m_henv);
 
+    if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO)
+    {
+        std::cout << "Failed to allocate environment handle." << std::endl;
+        return false;
+    }
+
 	// Set the ODBC version environment attribute  
 	if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
 		retcode = SQLSetEnvAttr(m_henv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER*)SQL_OV_ODBC3, 0);

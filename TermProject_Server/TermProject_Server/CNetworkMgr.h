@@ -41,6 +41,8 @@ private:
 	unordered_map<SOCKET, int> m_idMap;
 
 	std::unordered_map<OP_TYPE, std::function<void(int, int, OVER_EXP*)>> m_iocpfunc;
+
+
 	concurrency::concurrent_priority_queue<TIMER_EVENT> m_timerQueue;
 
 	array<CObject*, MAX_USER + MAX_NPC> m_objects;

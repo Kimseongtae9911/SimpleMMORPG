@@ -311,11 +311,6 @@ bool CNpc::Agro(int to)
 
 void CNpc::WakeUp(int waker)
 {
-	//OVER_EXP* exover = new OVER_EXP;
-	//exover->m_comp_type = OP_TYPE::OP_AI_HELLO;
-	//exover->m_ai_target_obj = waker;
-	//PostQueuedCompletionStatus(h_iocp, 1, npc_id, &exover->m_over);
-
 	m_ViewLock.lock();
 	m_view_list.insert(waker);
 	m_ViewLock.unlock();
@@ -436,16 +431,6 @@ bool CNpc::AStar(int startX, int startY, int destX, int destY, int* resultx, int
 	if (!IsUnBlocked(startX, startY) || !IsUnBlocked(destX, destY)) return false;
 	if (IsDest(startX, startY, destX, destY)) return false;
 
-	/*bool** closedList = new bool* [MONSTER_VIEW];
-	for (int i = 0; i < MONSTER_VIEW; ++i) {
-		closedList[i] = new bool[MONSTER_VIEW];
-
-		for (int j = 0; j < MONSTER_VIEW; ++j) {
-			closedList[i][j] = false;
-		}
-	}*/
-
-
 	bool closedList[MONSTER_VIEW * 2 + 1][MONSTER_VIEW * 2 + 1] = {};
 
 	for (int i = 0; i < MONSTER_VIEW; ++i) {
@@ -453,10 +438,7 @@ bool CNpc::AStar(int startX, int startY, int destX, int destY, int* resultx, int
 			closedList[i][j] = false;
 		}
 	}
-	/*Node** node = new Node * [MONSTER_VIEW];
-	for (int i = 0; i < MONSTER_VIEW; ++i) {
-		node[i] = new Node[MONSTER_VIEW];
-	}*/
+	
 	Node node[MONSTER_VIEW * 2 + 1][MONSTER_VIEW * 2 + 1] = {};
 
 	for (int i = 0; i < MONSTER_VIEW * 2 + 1; ++i) {
@@ -473,19 +455,15 @@ bool CNpc::AStar(int startX, int startY, int destX, int destY, int* resultx, int
 	startX = MONSTER_VIEW;
 	startY = MONSTER_VIEW;
 	
-
 	node[startY][startX].f = node[startY][startX].g = node[startY][startX].h = 0.f;
 	node[startY][startX].parentX = startX;
 	node[startY][startX].parentY = startY;
 
 	priority_queue<WeightPos> openList;
-	//set<WeightPos> openList;
+	
 	openList.push({ 0.f, startX, startY });
-	//openList.insert({ 0.f, startX, startY });
 
 	while (!openList.empty()) {
-		//WeightPos wp = *openList.begin();
-		//openList.erase(openList.begin());
 		WeightPos wp = openList.top();
 		openList.pop();
 
@@ -505,10 +483,6 @@ bool CNpc::AStar(int startX, int startY, int destX, int destY, int* resultx, int
 					node[ny][nx].parentX = x;
 					node[ny][nx].parentY = y;
 					FindPath(node, destX, destY, resultx, resulty);
-					/*for (int j = 0; j < MONSTER_VIEW; ++j) {
-						delete[] closedList[j];
-					}
-					delete[] closedList;*/
 					*resultx += (offsetX - MONSTER_VIEW);
 					*resulty += (offsetY - MONSTER_VIEW);					
 					return true;
@@ -525,7 +499,6 @@ bool CNpc::AStar(int startX, int startY, int destX, int destY, int* resultx, int
 						node[ny][nx].parentX = x;
 						node[ny][nx].parentY = y;
 
-						//openList.insert({ nf, nx, ny });
 						openList.push({ nf, nx, ny });
 					}
 				}
@@ -576,11 +549,7 @@ void CNpc::FindPath(Node node[MONSTER_VIEW * 2 + 1][MONSTER_VIEW * 2 + 1], int d
 
 	s.pop();
 	*x = s.top().parentX;
-	*y = s.top().parentY;
-
-	/*for (int i = 0; i < W_HEIGHT; ++i)
-		delete[] node[i];
-	delete[] node;*/
+	*y = s.top().parentY;	
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

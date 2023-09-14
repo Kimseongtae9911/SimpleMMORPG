@@ -29,6 +29,8 @@ extern "C" {
 #pragma comment(lib, "MSWSock.lib")
 #pragma comment (lib, "lua54.lib")
 
+#define DATABASE
+
 using namespace std;
 
 constexpr int VIEW_RANGE = 7;
