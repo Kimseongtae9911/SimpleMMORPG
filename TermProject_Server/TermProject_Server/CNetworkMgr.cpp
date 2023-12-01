@@ -2,8 +2,10 @@
 #include "CNetworkMgr.h"
 #include "CPacketMgr.h"
 #include "GameUtil.h"
-#include "CObject.h"
+#include "CClient.h"
+#include "CNpc.h"
 #include "CDatabase.h"
+
 
 std::unique_ptr<CNetworkMgr> CNetworkMgr::m_instance;
 
@@ -13,14 +15,14 @@ bool CNetworkMgr::Initialize()
 		WSADATA WSAData;
 		WSAStartup(MAKEWORD(2, 2), &WSAData);
 
-		m_iocpfunc.insert({ OP_TYPE::OP_ACCEPT, [this](int id, int bytes, OVER_EXP* over_ex) {Accept(id, bytes, over_ex); } });
-		m_iocpfunc.insert({ OP_TYPE::OP_MONSTER_RESPAWN, [this](int id, int bytes, OVER_EXP* over_ex) {MonsterRespawn(id, bytes, over_ex); } });
-		m_iocpfunc.insert({ OP_TYPE::OP_NPC_MOVE, [this](int id, int bytes, OVER_EXP* over_ex) {NpcMove(id, bytes, over_ex); } });
-		m_iocpfunc.insert({ OP_TYPE::OP_PLAYER_HEAL, [this](int id, int bytes, OVER_EXP* over_ex) {PlayerHeal(id, bytes, over_ex); } });
-		m_iocpfunc.insert({ OP_TYPE::OP_RECV, [this](int id, int bytes, OVER_EXP* over_ex) {Recv(id, bytes, over_ex); } });
-		m_iocpfunc.insert({ OP_TYPE::OP_SEND, [this](int id, int bytes, OVER_EXP* over_ex) {Send(id, bytes, over_ex); } });
+		m_iocpfunc.insert({ OP_TYPE::OP_ACCEPT, [this](int id, int bytes, COverlapEx* over_ex) {Accept(id, bytes, over_ex); } });
+		m_iocpfunc.insert({ OP_TYPE::OP_MONSTER_RESPAWN, [this](int id, int bytes, COverlapEx* over_ex) {MonsterRespawn(id, bytes, over_ex); } });
+		m_iocpfunc.insert({ OP_TYPE::OP_NPC_MOVE, [this](int id, int bytes, COverlapEx* over_ex) {NpcMove(id, bytes, over_ex); } });
+		m_iocpfunc.insert({ OP_TYPE::OP_PLAYER_HEAL, [this](int id, int bytes, COverlapEx* over_ex) {PlayerHeal(id, bytes, over_ex); } });
+		m_iocpfunc.insert({ OP_TYPE::OP_RECV, [this](int id, int bytes, COverlapEx* over_ex) {Recv(id, bytes, over_ex); } });
+		m_iocpfunc.insert({ OP_TYPE::OP_SEND, [this](int id, int bytes, COverlapEx* over_ex) {Send(id, bytes, over_ex); } });
 
-		m_over = new OVER_EXP;
+		m_over = new COverlapEx;
 #ifdef DATABASE
 		m_database = new CDatabase();
 		m_database->Initialize();
@@ -31,7 +33,7 @@ bool CNetworkMgr::Initialize()
 		GameUtil::InitailzeData();
 
 		for (int i = 0; i < MAX_USER; ++i) {
-			m_objects[i] = new CPlayer();
+			m_objects[i] = new CClient();
 		}
 		cout << "Initialize NPC Start" << endl;
 		for (int i = MAX_USER; i < MAX_USER + MAX_NPC; ++i) {
@@ -106,7 +108,7 @@ void CNetworkMgr::WorkerFunc()
 		ULONG_PTR key;
 		WSAOVERLAPPED* over = nullptr;
 		BOOL ret = GetQueuedCompletionStatus(m_iocp, &num_bytes, &key, &over, INFINITE);
-		OVER_EXP* ex_over = reinterpret_cast<OVER_EXP*>(over);
+		COverlapEx* ex_over = reinterpret_cast<COverlapEx*>(over);
 		if (FALSE == ret) {
 			if (ex_over->m_comp_type == OP_TYPE::OP_ACCEPT) cout << "Accept Error";
 			else {
@@ -147,19 +149,19 @@ void CNetworkMgr::TimerFunc()
 			case EV_RANDOM_MOVE:
 			case EV_CHASE_PLAYER:
 			case EV_ATTACK_PLAYER: {
-				OVER_EXP* ov = new OVER_EXP;
+				COverlapEx* ov = new COverlapEx;
 				ov->m_comp_type = OP_TYPE::OP_NPC_MOVE;
 				PostQueuedCompletionStatus(m_iocp, 1, ev.obj_id, &ov->m_over);
 				break;
 			}
 			case EV_PLAYER_HEAL: {
-				OVER_EXP* ov = new OVER_EXP;
+				COverlapEx* ov = new COverlapEx;
 				ov->m_comp_type = OP_TYPE::OP_PLAYER_HEAL;
 				PostQueuedCompletionStatus(m_iocp, 1, ev.obj_id, &ov->m_over);
 				break;
 			}
 			case EV_MONSTER_RESPAWN: {
-				OVER_EXP* ov = new OVER_EXP;
+				COverlapEx* ov = new COverlapEx;
 				ov->m_comp_type = OP_TYPE::OP_MONSTER_RESPAWN;
 				PostQueuedCompletionStatus(m_iocp, 1, ev.obj_id, &ov->m_over);
 				break;
@@ -171,7 +173,7 @@ void CNetworkMgr::TimerFunc()
 	}
 }
 
-void CNetworkMgr::Accept(int id, int bytes, OVER_EXP* over_ex)
+void CNetworkMgr::Accept(int id, int bytes, COverlapEx* over_ex)
 {
 	if (m_clientSock == -1) {
 		return;
@@ -179,10 +181,10 @@ void CNetworkMgr::Accept(int id, int bytes, OVER_EXP* over_ex)
 	int client_id = m_idMap.find(m_clientSock)->second;
 	{
 		lock_guard<mutex> ll(m_objects[client_id]->m_StateLock);
-		m_objects[client_id]->SetState(CL_STATE::ST_ALLOC);
+		reinterpret_cast<CClient*>(m_objects[client_id])->SetState(CL_STATE::ST_ALLOC);
 	}
 	CreateIoCompletionPort(reinterpret_cast<HANDLE>(m_clientSock), m_iocp, client_id, 0);
-	reinterpret_cast<CPlayer*>(m_objects[client_id])->PlayerAccept(client_id, m_clientSock);
+	reinterpret_cast<CClient*>(m_objects[client_id])->PlayerAccept(client_id, m_clientSock);
 
 	if (!m_socketpool.empty()) {
 		m_clientSock = m_socketpool.front();
@@ -198,28 +200,28 @@ void CNetworkMgr::Accept(int id, int bytes, OVER_EXP* over_ex)
 	AcceptEx(m_listenSock, m_clientSock, m_over->m_send_buf, 0, addr_size + 16, addr_size + 16, 0, &m_over->m_over);
 }
 
-void CNetworkMgr::MonsterRespawn(int id, int bytes, OVER_EXP* over_ex)
+void CNetworkMgr::MonsterRespawn(int id, int bytes, COverlapEx* over_ex)
 {
 	CNpc* npc = reinterpret_cast<CNpc*>(m_objects[id]);
 	npc->SetDie(false);
-	npc->SetCurHp(npc->GetMaxHp());
+	npc->GetStat()->SetCurHp(npc->GetStat()->GetMaxHp());
 	npc->SetPos(npc->GetRespawnX(), npc->GetRespawnY());
 	for (int i = 0; i < MAX_USER; ++i) {
-		if (m_objects[i]->GetState() != CL_STATE::ST_INGAME)
+		if (reinterpret_cast<CClient*>(m_objects[i])->GetState() != CL_STATE::ST_INGAME)
 			continue;
 		if (m_objects[i]->CanSee(npc->GetID()))
-			m_objects[i]->Send_AddObject_Packet(npc->GetID());
+			reinterpret_cast<CClient*>(m_objects[i])->Send_AddObject_Packet(npc->GetID());
 	}
 	TIMER_EVENT ev{ id, chrono::system_clock::now() + 1s, EV_RANDOM_MOVE, 0 };
 	m_timerQueue.push(ev);
 }
 
-void CNetworkMgr::PlayerHeal(int id, int bytes, OVER_EXP* over_ex)
+void CNetworkMgr::PlayerHeal(int id, int bytes, COverlapEx* over_ex)
 {
-	reinterpret_cast<CPlayer*>(m_objects[id])->Heal();
+	reinterpret_cast<CClient*>(m_objects[id])->Heal();
 }
 
-void CNetworkMgr::NpcMove(int id, int bytes, OVER_EXP* over_ex)
+void CNetworkMgr::NpcMove(int id, int bytes, COverlapEx* over_ex)
 {
 	if (true == reinterpret_cast<CNpc*>(m_objects[id])->GetDie()) {
 		delete over_ex;
@@ -271,29 +273,31 @@ void CNetworkMgr::NpcMove(int id, int bytes, OVER_EXP* over_ex)
 	delete over_ex;
 }
 
-void CNetworkMgr::Recv(int id, int bytes, OVER_EXP* over_ex)
+void CNetworkMgr::Recv(int id, int bytes, COverlapEx* over_ex)
 {
-	int remain_data = bytes + m_objects[id]->GetRemainBuf();
+	CClient* client = reinterpret_cast<CClient*>(m_objects[id]);
+
+	int remain_data = bytes + client->GetRemainBuf();
 	char* packet = over_ex->m_send_buf;
 
 	while (remain_data > 0) {
 		BASE_PACKET* p = reinterpret_cast<BASE_PACKET*>(packet);
 
 		if (p->size <= remain_data) {
-			CPacketMgr::GetInstance()->PacketProcess(p, reinterpret_cast<CPlayer*>(m_objects[id]));
+			CPacketMgr::GetInstance()->PacketProcess(p, client);
 			packet += p->size;
 			remain_data -= p->size;
 		}
 		else break;
 	}
-	m_objects[id]->SetRemainBuf(remain_data);
+	client->SetRemainBuf(remain_data);
 	if (remain_data > 0) {
 		memcpy(over_ex->m_send_buf, packet, remain_data);
 	}
-	m_objects[id]->RecvPacket();
+	client->RecvPacket();
 }
 
-void CNetworkMgr::Send(int id, int bytes, OVER_EXP* over_ex)
+void CNetworkMgr::Send(int id, int bytes, COverlapEx* over_ex)
 {
 	delete over_ex;
 }
@@ -302,7 +306,7 @@ int CNetworkMgr::GetNewID()
 {
 	for (int i = 0; i < MAX_USER; ++i) {
 		lock_guard <mutex> ll{ m_objects[i]->m_StateLock };
-		if (m_objects[i]->GetState() == CL_STATE::ST_FREE)
+		if (reinterpret_cast<CClient*>(m_objects[i])->GetState() == CL_STATE::ST_FREE)
 			return i;
 	}
 	return -1;
@@ -310,17 +314,18 @@ int CNetworkMgr::GetNewID()
 
 void CNetworkMgr::Disconnect(int id)
 {
-	CPlayer* pc = reinterpret_cast<CPlayer*>(m_objects[id]);
+	CClient* pc = reinterpret_cast<CClient*>(m_objects[id]);
+	CClientStat* stat = reinterpret_cast<CClientStat*>(m_objects[id]->GetStat());
 	USER_INFO ui;
 	memcpy(ui.name, pc->GetName(), NAME_SIZE);
 	ui.pos_x = pc->GetPosX();
 	ui.pos_y = pc->GetPosY();
-	ui.cur_hp = pc->GetCurHp();
-	ui.max_hp = pc->GetMaxHp();
-	ui.exp = pc->GetExp();
-	ui.cur_mp = pc->GetMp();
-	ui.max_mp = pc->GetMaxMp();
-	ui.level = pc->GetLevel();
+	ui.cur_hp = stat->GetCurHp();
+	ui.max_hp = stat->GetMaxHp();
+	ui.exp = stat->GetExp();
+	ui.cur_mp = stat->GetMp();
+	ui.max_mp = stat->GetMaxMp();
+	ui.level = stat->GetLevel();
 	ui.item1 = pc->GetItemType(0) - 1;
 	ui.item2 = pc->GetItemType(1) - 1;
 	ui.item3 = pc->GetItemType(2) - 1;
@@ -342,15 +347,15 @@ void CNetworkMgr::Disconnect(int id)
 		auto& pl = m_objects[p_id];
 		{
 			lock_guard<mutex> ll(pl->m_StateLock);
-			if (CL_STATE::ST_INGAME != pl->GetState())
+			if (CL_STATE::ST_INGAME != reinterpret_cast<CClient*>(pl)->GetState())
 				continue;
 		}
 		if (pl->GetID() == id)
 			continue;
-		pl->Send_RemoveObject_Packet(id);
+		reinterpret_cast<CClient*>(pl)->Send_RemoveObject_Packet(id);
 	}
-	closesocket(m_objects[id]->GetSocket());
+	closesocket(pc->GetSocket());
 
 	lock_guard<mutex> ll(m_objects[id]->m_StateLock);
-	m_objects[id]->SetState(CL_STATE::ST_FREE);
+	pc->SetState(CL_STATE::ST_FREE);
 }

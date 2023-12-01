@@ -25,6 +25,21 @@
     <Filter Include="소스 파일\Util">
       <UniqueIdentifier>{adc9de9c-0296-4ded-867b-ffeeaf4cc5ee}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\Resource">
+      <UniqueIdentifier>{659f7e30-9a84-4823-99ff-4c7189c9d7f0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Object\Client">
+      <UniqueIdentifier>{7420a33f-e281-4934-b88b-e21f31296ee9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Object\Item">
+      <UniqueIdentifier>{0b3aae37-a24c-458c-b04a-03e804b24197}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Object\CNpc">
+      <UniqueIdentifier>{ef04aaf3-c0a4-418c-b74e-93544bfdb72f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Object\Client\Stat">
+      <UniqueIdentifier>{e5bbe50c-b72f-4595-8880-9a12170ddb44}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -45,9 +60,6 @@
     <ClInclude Include="CObject.h">
       <Filter>소스 파일\Object</Filter>
     </ClInclude>
-    <ClInclude Include="CItem.h">
-      <Filter>소스 파일\Object</Filter>
-    </ClInclude>
     <ClInclude Include="GameUtil.h">
       <Filter>소스 파일\Util</Filter>
     </ClInclude>
@@ -58,6 +70,24 @@
       <Filter>소스 파일\Util</Filter>
     </ClInclude>
     <ClInclude Include="LuaFunc.h">
+      <Filter>소스 파일\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="COverlapEx.h">
+      <Filter>소스 파일\Resource</Filter>
+    </ClInclude>
+    <ClInclude Include="CItem.h">
+      <Filter>소스 파일\Object\Item</Filter>
+    </ClInclude>
+    <ClInclude Include="CClient.h">
+      <Filter>소스 파일\Object\Client</Filter>
+    </ClInclude>
+    <ClInclude Include="CNpc.h">
+      <Filter>소스 파일\Object\CNpc</Filter>
+    </ClInclude>
+    <ClInclude Include="CStat.h">
+      <Filter>소스 파일\Object\Client\Stat</Filter>
+    </ClInclude>
+    <ClInclude Include="ChatUtil.h">
       <Filter>소스 파일\Util</Filter>
     </ClInclude>
   </ItemGroup>
@@ -77,9 +107,6 @@
     <ClCompile Include="CObject.cpp">
       <Filter>소스 파일\Object</Filter>
     </ClCompile>
-    <ClCompile Include="CItem.cpp">
-      <Filter>소스 파일\Object</Filter>
-    </ClCompile>
     <ClCompile Include="GameUtil.cpp">
       <Filter>소스 파일\Util</Filter>
     </ClCompile>
@@ -90,6 +117,24 @@
       <Filter>소스 파일\Util</Filter>
     </ClCompile>
     <ClCompile Include="LuaFunc.cpp">
+      <Filter>소스 파일\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="COverlapEx.cpp">
+      <Filter>소스 파일\Resource</Filter>
+    </ClCompile>
+    <ClCompile Include="CItem.cpp">
+      <Filter>소스 파일\Object\Item</Filter>
+    </ClCompile>
+    <ClCompile Include="CClient.cpp">
+      <Filter>소스 파일\Object\Client</Filter>
+    </ClCompile>
+    <ClCompile Include="CNpc.cpp">
+      <Filter>소스 파일\Object\CNpc</Filter>
+    </ClCompile>
+    <ClCompile Include="CStat.cpp">
+      <Filter>소스 파일\Object\Client\Stat</Filter>
+    </ClCompile>
+    <ClCompile Include="ChatUtil.cpp">
       <Filter>소스 파일\Util</Filter>
     </ClCompile>
   </ItemGroup>

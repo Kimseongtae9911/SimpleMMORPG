@@ -1,7 +1,7 @@
 #pragma once
 
 class CObject;
-class OVER_EXP;
+class COverlapEx;
 class CDatabase;
 
 class CNetworkMgr
@@ -23,12 +23,12 @@ public:
 	void RegisterEvent(TIMER_EVENT& ev) { m_timerQueue.push(ev); }
 
 private:
-	void Accept(int id, int bytes, OVER_EXP* over_ex);
-	void MonsterRespawn(int id, int bytes, OVER_EXP* over_ex);
-	void PlayerHeal(int id, int bytes, OVER_EXP* over_ex);
-	void NpcMove(int id, int bytes, OVER_EXP* over_ex);
-	void Recv(int id, int bytes, OVER_EXP* over_ex);
-	void Send(int id, int bytes, OVER_EXP* over_ex);
+	void Accept(int id, int bytes, COverlapEx* over_ex);
+	void MonsterRespawn(int id, int bytes, COverlapEx* over_ex);
+	void PlayerHeal(int id, int bytes, COverlapEx* over_ex);
+	void NpcMove(int id, int bytes, COverlapEx* over_ex);
+	void Recv(int id, int bytes, COverlapEx* over_ex);
+	void Send(int id, int bytes, COverlapEx* over_ex);
 
 	int GetNewID();
 	void Disconnect(int id);
@@ -40,14 +40,14 @@ private:
 	std::queue<SOCKET> m_socketpool;
 	unordered_map<SOCKET, int> m_idMap;
 
-	std::unordered_map<OP_TYPE, std::function<void(int, int, OVER_EXP*)>> m_iocpfunc;
+	std::unordered_map<OP_TYPE, std::function<void(int, int, COverlapEx*)>> m_iocpfunc;
 
 
 	concurrency::concurrent_priority_queue<TIMER_EVENT> m_timerQueue;
 
 	array<CObject*, MAX_USER + MAX_NPC> m_objects;
 
-	OVER_EXP* m_over;
+	COverlapEx* m_over;
 
 	CDatabase* m_database;
 };

@@ -2,7 +2,7 @@
 #include "LuaFunc.h"
 #include "CNetworkMgr.h"
 #include "GameUtil.h"
-#include "CObject.h"
+#include "CNpc.h"
 
 int API_Initialize(lua_State* L)
 {
@@ -34,10 +34,10 @@ int API_Initialize(lua_State* L)
 	GameUtil::RegisterToSection(sectionY, sectionX, id);
 	int n = rand() % 5;
 	int level = (npc->GetPosX() / 100) * 5 + (npc->GetPosY() / 100) * 5 + n;
-	npc->SetLevel(level + 5);
-	npc->SetMaxHp(80 + npc->GetLevel() * 50);
-	npc->SetCurHp(npc->GetMaxHp());
-	npc->SetPower(10 + npc->GetLevel() * 5);
+	npc->GetStat()->SetLevel(level + 5);
+	npc->GetStat()->SetMaxHp(80 + npc->GetStat()->GetLevel() * 50);
+	npc->GetStat()->SetCurHp(npc->GetStat()->GetMaxHp());
+	npc->GetStat()->SetPower(10 + npc->GetStat()->GetLevel() * 5);
 	
 	if(id <= (MAX_NPC / 2) + MAX_USER)
 		npc->SetMonType(MONSTER_TYPE::AGRO);
@@ -71,6 +71,6 @@ int API_SendMessage(lua_State* L)
 	int user_id = (int)lua_tointeger(L, -2);
 	char* mess = (char*)lua_tostring(L, -1);
 	lua_pop(L, 4);
-	CNetworkMgr::GetInstance()->GetCObject(user_id)->Send_Chat_Packet(my_id, mess);
+	//CNetworkMgr::GetInstance()->GetCObject(user_id)->Send_Chat_Packet(my_id, mess);
 	return 0;
 }

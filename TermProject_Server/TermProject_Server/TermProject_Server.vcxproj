@@ -147,12 +147,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="CClient.h" />
     <ClInclude Include="CDatabase.h" />
+    <ClInclude Include="ChatUtil.h" />
     <ClInclude Include="CItem.h" />
     <ClInclude Include="CNetworkMgr.h" />
+    <ClInclude Include="CNpc.h" />
     <ClInclude Include="CObject.h" />
+    <ClInclude Include="COverlapEx.h" />
     <ClInclude Include="CPacketMgr.h" />
     <ClInclude Include="CServer.h" />
+    <ClInclude Include="CStat.h" />
     <ClInclude Include="GameUtil.h" />
     <ClInclude Include="LuaFunc.h" />
     <ClInclude Include="OverExp.h" />
@@ -160,12 +165,17 @@
     <ClInclude Include="protocol.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CClient.cpp" />
     <ClCompile Include="CDatabase.cpp" />
+    <ClCompile Include="ChatUtil.cpp" />
     <ClCompile Include="CItem.cpp" />
     <ClCompile Include="CNetworkMgr.cpp" />
+    <ClCompile Include="CNpc.cpp" />
     <ClCompile Include="CObject.cpp" />
+    <ClCompile Include="COverlapEx.cpp" />
     <ClCompile Include="CPacketMgr.cpp" />
     <ClCompile Include="CServer.cpp" />
+    <ClCompile Include="CStat.cpp" />
     <ClCompile Include="GameUtil.cpp" />
     <ClCompile Include="LuaFunc.cpp" />
     <ClCompile Include="main.cpp" />

@@ -3,20 +3,21 @@
 #include "CNetworkMgr.h"
 #include "CDatabase.h"
 #include "GameUtil.h"
-#include "CObject.h"
+#include "CClient.h"
+#include "CNpc.h"
 
 std::unique_ptr<CPacketMgr> CPacketMgr::m_instance;
 
 bool CPacketMgr::Initialize()
 {
 	try {
-		m_packetfunc.insert({ CS_LOGIN, [this](BASE_PACKET* p, CPlayer* c) {LoginPacket(p, c); } });
-		m_packetfunc.insert({ CS_MOVE ,[this](BASE_PACKET* p, CPlayer* c) {MovePacket(p, c); } });
-		m_packetfunc.insert({ CS_CHAT ,[this](BASE_PACKET* p, CPlayer* c) {ChatPacket(p, c); } });
-		m_packetfunc.insert({ CS_TELEPORT, [this](BASE_PACKET* p, CPlayer* c) {TeleportPacket(p, c); } });
-		m_packetfunc.insert({ CS_LOGOUT, [this](BASE_PACKET* p, CPlayer* c) {LogoutPacket(p, c); } });
-		m_packetfunc.insert({ CS_ATTACK, [this](BASE_PACKET* p, CPlayer* c) {AttackPacket(p, c); } });
-		m_packetfunc.insert({ CS_USE_ITEM, [this](BASE_PACKET* p, CPlayer* c) {UseItemPacket(p, c); } });
+		m_packetfunc.insert({ CS_LOGIN, [this](BASE_PACKET* p, CClient* c) {LoginPacket(p, c); } });
+		m_packetfunc.insert({ CS_MOVE ,[this](BASE_PACKET* p, CClient* c) {MovePacket(p, c); } });
+		m_packetfunc.insert({ CS_CHAT ,[this](BASE_PACKET* p, CClient* c) {ChatPacket(p, c); } });
+		m_packetfunc.insert({ CS_TELEPORT, [this](BASE_PACKET* p, CClient* c) {TeleportPacket(p, c); } });
+		m_packetfunc.insert({ CS_LOGOUT, [this](BASE_PACKET* p, CClient* c) {LogoutPacket(p, c); } });
+		m_packetfunc.insert({ CS_ATTACK, [this](BASE_PACKET* p, CClient* c) {AttackPacket(p, c); } });
+		m_packetfunc.insert({ CS_USE_ITEM, [this](BASE_PACKET* p, CClient* c) {UseItemPacket(p, c); } });
 
 		return true;
 	}
@@ -31,7 +32,7 @@ bool CPacketMgr::Release()
     return false;
 }
 
-void CPacketMgr::PacketProcess(BASE_PACKET* packet, CPlayer* client)
+void CPacketMgr::PacketProcess(BASE_PACKET* packet, CClient* client)
 {
 	if (true == m_packetfunc.contains(packet->type)) {
 		m_packetfunc[packet->type](packet, client);
@@ -41,7 +42,7 @@ void CPacketMgr::PacketProcess(BASE_PACKET* packet, CPlayer* client)
 	}
 }
 
-void CPacketMgr::LoginPacket(BASE_PACKET* packet, CPlayer* client)
+void CPacketMgr::LoginPacket(BASE_PACKET* packet, CClient* client)
 {
 	CS_LOGIN_PACKET* p = reinterpret_cast<CS_LOGIN_PACKET*>(packet);
 
@@ -61,24 +62,26 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CPlayer* client)
 			}
 			else {
 				client->SetName(p->name);
-				client->SetExp(user_info->exp);
+				CClientStat* stat = reinterpret_cast<CClientStat*>(client->GetStat()); 
+				stat->SetExp(user_info->exp);
 				{
 					lock_guard<mutex> ll{ client->m_StateLock };
 					client->SetPos(user_info->pos_x, user_info->pos_y);
-					client->SetLevel(user_info->level);
-					client->SetMaxHp(user_info->max_hp);
-					client->SetCurHp(user_info->cur_hp);
-					client->SetMaxExp(INIT_EXP + (user_info->level - 1) * EXP_UP);
-					client->SetMaxMp(user_info->max_mp);
-					client->SetMp(user_info->cur_mp);
+					stat->SetLevel(user_info->level);
+					stat->SetMaxHp(user_info->max_hp);
+					stat->SetCurHp(user_info->cur_hp);
+					stat->SetMaxExp(INIT_EXP + (user_info->level - 1) * EXP_UP);
+					stat->SetMaxMp(user_info->max_mp);
+					stat->SetMp(user_info->cur_mp);
 					client->SetState(CL_STATE::ST_INGAME);
 				}
 
 				client->Send_LoginInfo_Packet();
 				for (auto& pl : CNetworkMgr::GetInstance()->GetAllObject()) {
+					CClient* cl = reinterpret_cast<CClient*>(pl);
 					{
 						lock_guard<mutex> ll(pl->m_StateLock);
-						if (CL_STATE::ST_INGAME != pl->GetState())
+						if (CL_STATE::ST_INGAME != cl->GetState())
 							continue;
 					}
 					if (pl->GetID() == client->GetID())
@@ -86,7 +89,7 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CPlayer* client)
 					if (false == client->CanSee(pl->GetID()))
 						continue;
 					if (pl->GetID() < MAX_USER)
-						pl->Send_AddObject_Packet(client->GetID());
+						cl->Send_AddObject_Packet(client->GetID());
 					else
 						reinterpret_cast<CNpc*>(pl)->WakeUp(client->GetID());
 					client->Send_AddObject_Packet(pl->GetID());
@@ -167,20 +170,22 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CPlayer* client)
 	else {
 		client->SetName(p->name);
 		client->SetPos(rand() % W_WIDTH, rand() % W_HEIGHT);
-		client->SetMaxHp(1000000);
-		client->SetCurHp(1000000);
-		client->SetMaxExp(100);
-		client->SetMaxMp(100);
-		client->SetMp(100);
+		CClientStat* stat = reinterpret_cast<CClientStat*>(client->GetStat());
+		stat->SetMaxHp(1000000);
+		stat->SetCurHp(1000000);
+		stat->SetMaxExp(100);
+		stat->SetMaxMp(100);
+		stat->SetMp(100);
 		{
 			lock_guard<mutex> ll{ client->m_StateLock };
 			client->SetState(CL_STATE::ST_INGAME);
 		}
 		client->Send_LoginInfo_Packet();
 		for (auto& pl : CNetworkMgr::GetInstance()->GetAllObject()) {
+			CClient* cl = reinterpret_cast<CClient*>(pl);
 			{
 				lock_guard<mutex> ll(pl->m_StateLock);
-				if (CL_STATE::ST_INGAME != pl->GetState())
+				if (CL_STATE::ST_INGAME != cl->GetState())
 					continue;
 			}
 			if (pl->GetID() == client->GetID())
@@ -188,7 +193,7 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CPlayer* client)
 			if (false == client->CanSee(pl->GetID()))
 				continue;
 			if (pl->GetID() < MAX_USER)
-				pl->Send_AddObject_Packet(client->GetID());
+				cl->Send_AddObject_Packet(client->GetID());
 			else
 				reinterpret_cast<CNpc*>(pl)->WakeUp(client->GetID());
 			client->Send_AddObject_Packet(pl->GetID());
@@ -196,7 +201,7 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CPlayer* client)
 	}
 }
 
-void CPacketMgr::MovePacket(BASE_PACKET* packet, CPlayer* client)
+void CPacketMgr::MovePacket(BASE_PACKET* packet, CClient* client)
 {
 	CS_MOVE_PACKET* p = reinterpret_cast<CS_MOVE_PACKET*>(packet);
 	client->last_move_time = p->move_time;
@@ -239,14 +244,15 @@ void CPacketMgr::MovePacket(BASE_PACKET* packet, CPlayer* client)
 		for (auto& pl : near_list) {
 			CObject* cpl = CNetworkMgr::GetInstance()->GetCObject(pl);
 			if (pl < MAX_USER) {
+				CClient* cl = reinterpret_cast<CClient*>(cpl);
 				cpl->m_ViewLock.lock_shared();
 				if (cpl->GetViewList().count(client->GetID())) {
 					cpl->m_ViewLock.unlock_shared();
-					cpl->Send_Move_Packet(client->GetID());
+					cl->Send_Move_Packet(client->GetID());
 				}
 				else {
 					cpl->m_ViewLock.unlock_shared();
-					cpl->Send_AddObject_Packet(client->GetID());
+					cl->Send_AddObject_Packet(client->GetID());
 				}
 			}
 			else {
@@ -261,7 +267,7 @@ void CPacketMgr::MovePacket(BASE_PACKET* packet, CPlayer* client)
 			if (0 == near_list.count(pl)) {
 				client->Send_RemoveObject_Packet(pl);
 				if (pl < MAX_USER)
-					CNetworkMgr::GetInstance()->GetCObject(pl)->Send_RemoveObject_Packet(client->GetID());
+					reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->Send_RemoveObject_Packet(client->GetID());
 				else {
 					reinterpret_cast<CNpc*>(CNetworkMgr::GetInstance()->GetCObject(pl))->RemoveClient(client->GetID());
 				}
@@ -270,22 +276,23 @@ void CPacketMgr::MovePacket(BASE_PACKET* packet, CPlayer* client)
 	}
 }
 
-void CPacketMgr::ChatPacket(BASE_PACKET* packet, CPlayer* client)
+void CPacketMgr::ChatPacket(BASE_PACKET* packet, CClient* client)
 {
 }
 
-void CPacketMgr::TeleportPacket(BASE_PACKET* packet, CPlayer* client)
+void CPacketMgr::TeleportPacket(BASE_PACKET* packet, CClient* client)
 {
 }
 
-void CPacketMgr::LogoutPacket(BASE_PACKET* packet, CPlayer* client)
+void CPacketMgr::LogoutPacket(BASE_PACKET* packet, CClient* client)
 {
 }
 
-void CPacketMgr::AttackPacket(BASE_PACKET* packet, CPlayer* client)
+void CPacketMgr::AttackPacket(BASE_PACKET* packet, CClient* client)
 {
 	CS_ATTACK_PACKET* p = reinterpret_cast<CS_ATTACK_PACKET*>(packet);
 	if (client->CanUse(p->skill, p->time)) {
+		CClientStat* stat = reinterpret_cast<CClientStat*>(client->GetStat());
 		switch (p->skill) {
 		case 0:
 			client->Attack();
@@ -293,26 +300,26 @@ void CPacketMgr::AttackPacket(BASE_PACKET* packet, CPlayer* client)
 		case 1:
 			if (false == client->GetPowerUp()) {
 				client->Skill1();
-				client->SetMp(client->GetMp() - 15);
-				client->SetPower(client->GetPower() * 2);
+				stat->SetMp(stat->GetMp() - 15);
+				stat->SetPower(stat->GetPower() * 2);
 				client->Send_StatChange_Packet();
 			}
 			break;
 		case 2:
 			client->Skill2();
-			client->SetMp(client->GetMp() - 5);
+			stat->SetMp(stat->GetMp() - 5);
 			client->Send_StatChange_Packet();
 			break;
 		case 3:
 			client->Skill3();
-			client->SetMp(client->GetMp() - 10);
+			stat->SetMp(stat->GetMp() - 10);
 			client->Send_StatChange_Packet();
 			break;
 		}
 	}
 }
 
-void CPacketMgr::UseItemPacket(BASE_PACKET* packet, CPlayer* client)
+void CPacketMgr::UseItemPacket(BASE_PACKET* packet, CClient* client)
 {
 	CS_USE_ITEM_PACKET* p = reinterpret_cast<CS_USE_ITEM_PACKET*>(packet);
 	client->UseItem(p->inven);
@@ -323,7 +330,7 @@ bool CPacketMgr::CheckLoginFail(char* name)
 	if (!strcmp("Stress_Test", name))
 		return false;
 	for (int i = 0; i < MAX_USER; ++i) {
-		CObject* client = CNetworkMgr::GetInstance()->GetCObject(i);
+		CClient* client = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(i));
 		client->m_StateLock.lock();
 		if (client->GetState() == CL_STATE::ST_INGAME) {
 			client->m_StateLock.unlock();

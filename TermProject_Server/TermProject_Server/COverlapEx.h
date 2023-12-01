@@ -24,4 +24,3 @@ public:
 		memcpy(m_send_buf, packet, packet[0]);
 	}
 };
-
