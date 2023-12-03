@@ -13,7 +13,7 @@ CObject::~CObject()
 {
 }
 
-const bool CObject::CanSee(int to) const
+bool CObject::CanSee(int to) const
 {
 	if (abs(GetPosX() - CNetworkMgr::GetInstance()->GetCObject(to)->GetPosX()) > VIEW_RANGE)
 		return false;

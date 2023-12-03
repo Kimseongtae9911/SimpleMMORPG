@@ -6,7 +6,6 @@
 #include "CNetworkMgr.h"
 #include "CClient.h"
 #include "CItemGenerator.h"
-#include "ChatUtil.h"
 
 CNpc::CNpc(int id)
 {
@@ -76,11 +75,12 @@ void CNpc::Chase()
 	for (auto pl : new_vl) {
 		// new_vl에는 있는데 old_vl에는 없을 때 플레이어의 시야에 등장
 		if (0 == old_vl.count(pl)) {
-			reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->Send_AddObject_Packet(m_ID);
+			reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->AddObjectToView(m_ID);
 		}
 		else {
 			// 플레이어가 계속 보고 있음.
-			reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->Send_Move_Packet(m_ID);
+			CClient* client = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl));
+			client->GetSession()->SendMovePacket(m_ID, x, y, client->lastMoveTime);
 		}
 	}
 
@@ -89,7 +89,7 @@ void CNpc::Chase()
 			CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.lock_shared();
 			if (0 != CNetworkMgr::GetInstance()->GetCObject(pl)->GetViewList().count(m_ID)) {
 				CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.unlock_shared();
-				reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->Send_RemoveObject_Packet(m_ID);
+				reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->RemoveObjectFromView(m_ID);
 			}
 			else {
 				CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.unlock_shared();
@@ -130,14 +130,15 @@ void CNpc::RandomMove()
 	for (auto pl : new_vl) {
 		// new_vl에는 있는데 old_vl에는 없을 때 플레이어의 시야에 등장
 		if (0 == old_vl.count(pl)) {
-			reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->Send_AddObject_Packet(m_ID);
+			reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->AddObjectToView(m_ID);
 			m_ViewLock.lock();
 			m_viewList.insert(pl);
 			m_ViewLock.unlock();
 		}
 		else {
 			// 플레이어가 계속 보고 있음.
-			reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->Send_Move_Packet(m_ID);
+			CClient* client = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl));
+			client->GetSession()->SendMovePacket(m_ID, x, y, client->lastMoveTime);
 		}
 	}
 
@@ -146,7 +147,7 @@ void CNpc::RandomMove()
 			CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.lock_shared();
 			if (0 != CNetworkMgr::GetInstance()->GetCObject(pl)->GetViewList().count(m_ID)) {
 				CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.unlock_shared();
-				reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->Send_RemoveObject_Packet(m_ID);
+				reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->RemoveObjectFromView(m_ID);
 				m_ViewLock.lock();
 				m_viewList.erase(pl);
 				m_ViewLock.unlock();
@@ -293,7 +294,7 @@ bool CNpc::Damaged(int power, int attackID)
 		if (m_monType == MONSTER_TYPE::AGRO)
 			exp *= 2;
 		reinterpret_cast<CClientStat*>(client->GetStat())->GainExp(exp);
-		client->Send_StatChange_Packet();
+		client->GetSession()->SendStatChangePacket(reinterpret_cast<CClientStat*>(client->GetStat()));
 
 		ChatUtil::SendNpcKillMsg(m_ID, exp, attackID);
 
@@ -306,7 +307,7 @@ bool CNpc::Damaged(int power, int attackID)
 			p.y = m_PosY;
 			p.item_type = static_cast<int>(itemType);
 			GameUtil::SetItemTile(m_PosY, m_PosX, itemType);
-			client->SendPacket(&p);
+			client->GetSession()->SendPacket(&p);
 		}
 
 		return true;

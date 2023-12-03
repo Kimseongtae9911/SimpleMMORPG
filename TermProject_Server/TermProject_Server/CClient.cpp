@@ -7,9 +7,7 @@
 
 CClient::CClient()
 {
-	m_Socket = 0;
 	m_State = CL_STATE::ST_FREE;
-	m_RemainBuf_Size = 0;
 
 	m_stat = make_unique<CClientStat>(20);
 
@@ -21,12 +19,15 @@ CClient::CClient()
 	for (int i = 0; i < m_items.size(); ++i) {
 		m_items[i] = new CItem();
 	}
+	m_session = new CSession();
 }
 
 CClient::~CClient()
 {
 	for (auto& skill : m_skills)
 		delete skill;
+
+	delete m_session;
 }
 
 void CClient::PlayerAccept(int id, SOCKET sock)
@@ -35,9 +36,7 @@ void CClient::PlayerAccept(int id, SOCKET sock)
 	m_PosY = 0;
 	m_ID = id;
 	m_name[0] = 0;
-	m_RemainBuf_Size = 0;
-	m_Socket = sock;
-	RecvPacket();
+	m_session->Initialize(sock);
 }
 
 void CClient::CheckItem()
@@ -89,7 +88,7 @@ void CClient::CheckItem()
 			p.item_type = m_items[index]->GetItemType();
 			p.x = m_PosX;
 			p.y = m_PosY;
-			SendPacket(&p);
+			m_session->SendPacket(&p);
 
 			switch (p.item_type) {
 			case ITEM_TYPE::CLOTH:
@@ -116,7 +115,7 @@ void CClient::CheckItem()
 			}
 
 			sprintf_s(msg, CHAT_SIZE, "%s Obtained", item);
-			Send_Chat_Packet(m_ID, msg);
+			m_session->SendChatPacket(m_ID, msg);
 		}
 		GameUtil::SetItemTile(m_PosY, m_PosX, ITEM_TYPE::NONE);
 	}
@@ -139,12 +138,12 @@ void CClient::UseItem(int inven)
 		case ITEM_TYPE::HP_POTION:
 			m_stat->HealHp(50);
 			use = true;
-			Send_Chat_Packet(m_ID, "Used HP Potion");
+			m_session->SendChatPacket(m_ID, "Used HP Potion");
 			break;
 		case ITEM_TYPE::MP_POTION:
 			reinterpret_cast<CClientStat*>(m_stat.get())->HealMp(30);
 			use = true;
-			Send_Chat_Packet(m_ID, "Used MP Potion");
+			m_session->SendChatPacket(m_ID, "Used MP Potion");
 			break;
 		default:
 			break;
@@ -155,8 +154,8 @@ void CClient::UseItem(int inven)
 			m_items[inven]->SetEnable(false);
 			m_items[inven]->SetItemType(ITEM_TYPE::NONE);
 			m_itemLock.unlock();
-			Send_StatChange_Packet();
-			Send_ItemUsed_Packet(inven);
+			m_session->SendStatChangePacket(reinterpret_cast<CClientStat*>(m_stat.get()));
+			m_session->SendItemUsePacket(inven);
 		}
 	}
 }
@@ -180,7 +179,7 @@ void CClient::Heal()
 	m_stat->HealHp(static_cast<int>(m_stat->GetMaxHp() * 0.1f));
 	stat->HealMp(static_cast<int>(stat->GetMaxMp() * 0.1f));
 
-	Send_StatChange_Packet();
+	m_session->SendStatChangePacket(reinterpret_cast<CClientStat*>(m_stat.get()));
 		
 	TIMER_EVENT ev{ m_ID, chrono::system_clock::now() + 5s, EV_PLAYER_HEAL, 0 };
 	CNetworkMgr::GetInstance()->RegisterEvent(ev);
@@ -280,114 +279,22 @@ bool CClient::Damaged(int power, int attackID)
 {
 	if (m_stat->Damaged(power)) {	
 		SetPos(48, 47);
-		Send_Move_Packet(m_ID);
-		Send_StatChange_Packet();
+		m_session->SendMovePacket(m_ID, 48, 47, lastMoveTime);
+		m_session->SendStatChangePacket(reinterpret_cast<CClientStat*>(m_stat.get()));
 		return true;
 	}
 	else {
-		Send_StatChange_Packet();
+		m_session->SendStatChangePacket(reinterpret_cast<CClientStat*>(m_stat.get()));
 		return false;
 	}
 }
 
-void CClient::Send_LoginInfo_Packet()
+void CClient::AddObjectToView(int c_id)
 {
-	SC_LOGIN_INFO_PACKET p;
-	p.id = m_ID;
-	p.size = sizeof(SC_LOGIN_INFO_PACKET);
-	p.type = SC_LOGIN_INFO;
-	p.x = m_PosX;
-	p.y = m_PosY;
+	m_ViewLock.lock();
+	m_viewList.insert(c_id);
+	m_ViewLock.unlock();
 
-	CClientStat* stat = reinterpret_cast<CClientStat*>(m_stat.get());
-	p.max_hp = m_stat->GetMaxHp();
-	p.hp = m_stat->GetCurHp();
-	p.max_mp = stat->GetMaxMp();
-	p.mp = stat->GetCurMp();
-	p.exp = stat->GetExp();
-	p.level = stat->GetLevel();
-	strcpy_s(p.name, m_name);
-	SendPacket(&p);
-}
-
-void CClient::Send_StatChange_Packet()
-{
-	SC_STAT_CHANGE_PACKET packet;
-
-	packet.size = sizeof(packet);
-	packet.type = SC_STAT_CHANGE;
-
-	CClientStat* stat = reinterpret_cast<CClientStat*>(m_stat.get());
-	packet.max_hp = m_stat->GetMaxHp();
-	packet.hp = m_stat->GetCurHp();
-	packet.max_mp = stat->GetMaxMp();
-	packet.mp = stat->GetCurMp();
-	packet.exp = stat->GetExp();
-	packet.level = stat->GetLevel();
-
-	SendPacket(&packet);
-}
-
-void CClient::Send_Damage_Packet(int cid, int powerlv)
-{
-	SC_DAMAGE_PACKET p;
-
-	p.size = sizeof(p);
-	p.type = SC_DAMAGE;
-	p.id = cid;
-	p.hp = CNetworkMgr::GetInstance()->GetCObject(cid)->GetStat()->GetCurHp();
-
-	SendPacket(&p);
-}
-
-void CClient::Send_ItemUsed_Packet(int inven)
-{
-	SC_ITEM_USED_PACKET p;
-
-	p.size = sizeof(p);
-	p.type = SC_ITEM_USED;
-	p.inven_num = inven;
-
-	SendPacket(&p);
-}
-
-void CClient::RecvPacket()
-{
-	DWORD recv_flag = 0;
-	memset(&m_recvOver.m_over, 0, sizeof(m_recvOver.m_over));
-	m_recvOver.m_Wsabuf.len = BUF_SIZE - m_RemainBuf_Size;
-	m_recvOver.m_Wsabuf.buf = m_recvOver.m_send_buf + m_RemainBuf_Size;
-	WSARecv(m_Socket, &m_recvOver.m_Wsabuf, 1, 0, &recv_flag, &m_recvOver.m_over, 0);
-}
-
-void CClient::SendPacket(void* packet)
-{
-	COverlapEx* sdata = new COverlapEx{ reinterpret_cast<char*>(packet) };
-	WSASend(m_Socket, &sdata->m_Wsabuf, 1, 0, 0, &sdata->m_over, 0);
-}
-
-void CClient::Send_LoginFail_Packet()
-{
-	SC_LOGIN_FAIL_PACKET p;
-	p.size = sizeof(SC_LOGIN_FAIL_PACKET);
-	p.type = SC_LOGIN_FAIL;
-	SendPacket(&p);
-}
-
-void CClient::Send_Move_Packet(int c_id)
-{
-	SC_MOVE_OBJECT_PACKET p;
-	p.id = c_id;
-	p.size = sizeof(SC_MOVE_OBJECT_PACKET);
-	p.type = SC_MOVE_OBJECT;
-	p.x = CNetworkMgr::GetInstance()->GetCObject(c_id)->GetPosX();
-	p.y = CNetworkMgr::GetInstance()->GetCObject(c_id)->GetPosY();
-	p.move_time = last_move_time;
-	SendPacket(&p);
-}
-
-void CClient::Send_AddObject_Packet(int c_id)
-{
 	SC_ADD_OBJECT_PACKET add_packet;
 	add_packet.id = c_id;
 	strcpy_s(add_packet.name, CNetworkMgr::GetInstance()->GetCObject(c_id)->GetName());
@@ -411,23 +318,10 @@ void CClient::Send_AddObject_Packet(int c_id)
 		add_packet.max_hp = 0;
 	}
 
-	m_ViewLock.lock();
-	m_viewList.insert(c_id);
-	m_ViewLock.unlock();
-	SendPacket(&add_packet);
+	m_session->SendPacket(&add_packet);
 }
 
-void CClient::Send_Chat_Packet(int c_id, const char* mess)
-{
-	SC_CHAT_PACKET packet;
-	packet.id = c_id;
-	packet.size = sizeof(packet);
-	packet.type = SC_CHAT;
-	strcpy_s(packet.mess, mess);
-	SendPacket(&packet);
-}
-
-void CClient::Send_RemoveObject_Packet(int c_id)
+void CClient::RemoveObjectFromView(int c_id)
 {
 	m_ViewLock.lock();
 	if (m_viewList.count(c_id))
@@ -437,9 +331,10 @@ void CClient::Send_RemoveObject_Packet(int c_id)
 		return;
 	}
 	m_ViewLock.unlock();
+
 	SC_REMOVE_OBJECT_PACKET p;
 	p.id = c_id;
 	p.size = sizeof(p);
 	p.type = SC_REMOVE_OBJECT;
-	SendPacket(&p);
+	m_session->SendPacket(&p);
 }

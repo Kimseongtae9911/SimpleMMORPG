@@ -18,7 +18,7 @@ void ChatUtil::SendDamageMsg(int targetID, int power, char* name)
 		else {
 			sprintf_s(msg, CHAT_SIZE, "%s has been damaged %d by %s", targetClient->GetName(), power, name);
 		}
-		otherClient->Send_Chat_Packet(i, msg);
+		otherClient->GetSession()->SendChatPacket(i, msg);
 	}
 }
 
@@ -31,7 +31,7 @@ void ChatUtil::SendNpcDamageMsg(int npcID, int clientID)
 
 	for (const auto id : chatClients) {
 		CClient* otherClient = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(id));
-		otherClient->Send_Damage_Packet(npcID, 3);
+		otherClient->GetSession()->SendDamagePacket(npcID, 3, npc->GetStat()->GetCurHp());
 		char msg[CHAT_SIZE];
 		if (id == clientID) {
 			sprintf_s(msg, CHAT_SIZE, "Damaged %d at %s", client->GetStat()->GetPower() * 2, npc->GetName());
@@ -39,7 +39,7 @@ void ChatUtil::SendNpcDamageMsg(int npcID, int clientID)
 		else {
 			sprintf_s(msg, CHAT_SIZE, "%s Damaged %d at %s", client->GetName(), client->GetStat()->GetPower() * 2, npc->GetName());
 		}
-		otherClient->Send_Chat_Packet(id, msg);
+		otherClient->GetSession()->SendChatPacket(id, msg);
 	}
 }
 
@@ -52,7 +52,7 @@ void ChatUtil::SendNpcKillMsg(int npcID, int exp, int clientID)
 
 	for (const auto id : chatClients) {
 		CClient* otherClient = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(id));
-		otherClient->Send_RemoveObject_Packet(npcID);
+		otherClient->RemoveObjectFromView(npcID);
 		char msg[CHAT_SIZE];
 		if (id == clientID) {
 			sprintf_s(msg, CHAT_SIZE, "Obtained %dExp by killing %s", exp, npc->GetName());
@@ -60,6 +60,6 @@ void ChatUtil::SendNpcKillMsg(int npcID, int exp, int clientID)
 		else {
 			sprintf_s(msg, CHAT_SIZE, "%s Killed %s", client->GetName(), npc->GetName());
 		}
-		otherClient->Send_Chat_Packet(id, msg);
+		otherClient->GetSession()->SendChatPacket(id, msg);
 	}
 }

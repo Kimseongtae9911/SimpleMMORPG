@@ -43,15 +43,18 @@
     <Filter Include="소스 파일\Object\Client\Skill">
       <UniqueIdentifier>{04f7bd04-02f5-43fe-abb2-89f7f0617666}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\Object\Client\Session">
+      <UniqueIdentifier>{3b1643e3-0059-4bc2-ad86-b6055ef6a617}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Database">
+      <UniqueIdentifier>{84236e9d-38e0-42fc-83a6-30edccd97a85}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="protocol.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="CDatabase.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="CServer.h">
@@ -99,12 +102,15 @@
     <ClInclude Include="CSkill.h">
       <Filter>소스 파일\Object\Client\Skill</Filter>
     </ClInclude>
+    <ClInclude Include="CSession.h">
+      <Filter>소스 파일\Object\Client\Session</Filter>
+    </ClInclude>
+    <ClInclude Include="CDatabase.h">
+      <Filter>소스 파일\Database</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="CDatabase.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="CServer.cpp">
@@ -151,6 +157,12 @@
     </ClCompile>
     <ClCompile Include="CSkill.cpp">
       <Filter>소스 파일\Object\Client\Skill</Filter>
+    </ClCompile>
+    <ClCompile Include="CSession.cpp">
+      <Filter>소스 파일\Object\Client\Session</Filter>
+    </ClCompile>
+    <ClCompile Include="CDatabase.cpp">
+      <Filter>소스 파일\Database</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

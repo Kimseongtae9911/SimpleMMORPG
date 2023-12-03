@@ -22,7 +22,7 @@ public:
 
 	const unordered_set<int>& GetViewList() const {return m_viewList; }	
 
-	const bool CanSee(int to) const;
+	bool CanSee(int to) const;
 	
 	virtual unordered_set<int> CheckSection() { return {}; }
 	virtual bool Damaged(int power, int attackID) = 0;
@@ -30,7 +30,7 @@ public:
 public:
 	mutex m_StateLock;
 	shared_mutex m_ViewLock;
-	int	last_move_time;
+	unsigned int lastMoveTime;
 
 protected:
 	unordered_set<int> m_viewList;

@@ -5,7 +5,7 @@
 #include "CClient.h"
 #include "CNpc.h"
 #include "CDatabase.h"
-
+#include "COverlapEx.h"
 
 std::unique_ptr<CNetworkMgr> CNetworkMgr::m_instance;
 
@@ -237,7 +237,7 @@ void CNetworkMgr::MonsterRespawn(int id, int bytes, COverlapEx* over_ex)
 		if (reinterpret_cast<CClient*>(m_objects[i])->GetState() != CL_STATE::ST_INGAME)
 			continue;
 		if (m_objects[i]->CanSee(npc->GetID()))
-			reinterpret_cast<CClient*>(m_objects[i])->Send_AddObject_Packet(npc->GetID());
+			reinterpret_cast<CClient*>(m_objects[i])->AddObjectToView(npc->GetID());
 	}
 	TIMER_EVENT ev{ id, chrono::system_clock::now() + 1s, EV_RANDOM_MOVE, 0 };
 	m_timerQueue.push(ev);
@@ -310,7 +310,7 @@ void CNetworkMgr::Recv(int id, int bytes, COverlapEx* over_ex)
 {
 	CClient* client = reinterpret_cast<CClient*>(m_objects[id]);
 
-	int remain_data = bytes + client->GetRemainBuf();
+	int remain_data = bytes + client->GetSession()->GetRemainBuf();
 	char* packet = over_ex->m_send_buf;
 
 	while (remain_data > 0) {
@@ -323,11 +323,11 @@ void CNetworkMgr::Recv(int id, int bytes, COverlapEx* over_ex)
 		}
 		else break;
 	}
-	client->SetRemainBuf(remain_data);
+	client->GetSession()->SetRemainBuf(remain_data);
 	if (remain_data > 0) {
 		memcpy(over_ex->m_send_buf, packet, remain_data);
 	}
-	client->RecvPacket();
+	client->GetSession()->RecvPacket();
 }
 
 void CNetworkMgr::Send(int id, int bytes, COverlapEx* over_ex)
@@ -385,9 +385,9 @@ void CNetworkMgr::Disconnect(int id)
 		}
 		if (pl->GetID() == id)
 			continue;
-		reinterpret_cast<CClient*>(pl)->Send_RemoveObject_Packet(id);
+		reinterpret_cast<CClient*>(pl)->RemoveObjectFromView(id);
 	}
-	closesocket(pc->GetSocket());
+	closesocket(pc->GetSession()->GetSocket());
 
 	lock_guard<mutex> ll(m_objects[id]->m_StateLock);
 	pc->SetState(CL_STATE::ST_FREE);

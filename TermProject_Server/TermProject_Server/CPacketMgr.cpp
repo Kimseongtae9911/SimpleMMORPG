@@ -76,7 +76,7 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CClient* client)
 					client->SetState(CL_STATE::ST_INGAME);
 				}
 
-				client->Send_LoginInfo_Packet();
+				client->GetSession()->SendLoginInfoPacket(client->GetID(), user_info->pos_x, user_info->pos_y, p->name, stat);
 				for (auto& pl : CNetworkMgr::GetInstance()->GetAllObject()) {
 					CClient* cl = reinterpret_cast<CClient*>(pl);
 					{
@@ -89,10 +89,10 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CClient* client)
 					if (false == client->CanSee(pl->GetID()))
 						continue;
 					if (pl->GetID() < MAX_USER)
-						cl->Send_AddObject_Packet(client->GetID());
+						cl->AddObjectToView(client->GetID());
 					else
 						reinterpret_cast<CNpc*>(pl)->WakeUp(client->GetID());
-					client->Send_AddObject_Packet(pl->GetID());
+					client->AddObjectToView(pl->GetID());
 				}
 				if (user_info->item1 != -1) {
 					client->SetItem(0, static_cast<ITEM_TYPE>(user_info->item1 + 1), user_info->moneycnt, true);
@@ -103,7 +103,7 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CClient* client)
 					p.item_type = static_cast<ITEM_TYPE>(user_info->item1 + 1);
 					p.x = client->GetPosX();
 					p.y = client->GetPosY();
-					client->SendPacket(&p);
+					client->GetSession()->SendPacket(&p);
 				}
 				if (user_info->item2 != -1) {
 					client->SetItem(1, static_cast<ITEM_TYPE>(user_info->item2 + 1), 0, true);
@@ -114,7 +114,7 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CClient* client)
 					p.item_type = static_cast<ITEM_TYPE>(user_info->item2 + 1);
 					p.x = client->GetPosX();
 					p.y = client->GetPosY();
-					client->SendPacket(&p);
+					client->GetSession()->SendPacket(&p);
 				}
 				if (user_info->item3 != -1) {
 					client->SetItem(2, static_cast<ITEM_TYPE>(user_info->item3 + 1), 0, true);
@@ -125,7 +125,7 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CClient* client)
 					p.item_type = static_cast<ITEM_TYPE>(user_info->item3 + 1);
 					p.x = client->GetPosX();
 					p.y = client->GetPosY();
-					client->SendPacket(&p);
+					client->GetSession()->SendPacket(&p);
 				}
 				if (user_info->item4 != -1) {
 					client->SetItem(3, static_cast<ITEM_TYPE>(user_info->item4 + 1), 0, true);
@@ -136,7 +136,7 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CClient* client)
 					p.item_type = static_cast<ITEM_TYPE>(user_info->item4 + 1);
 					p.x = client->GetPosX();
 					p.y = client->GetPosY();
-					client->SendPacket(&p);
+					client->GetSession()->SendPacket(&p);
 				}
 				if (user_info->item5 != -1) {
 					client->SetItem(4, static_cast<ITEM_TYPE>(user_info->item5 + 1), 0, true);
@@ -147,7 +147,7 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CClient* client)
 					p.item_type = static_cast<ITEM_TYPE>(user_info->item5 + 1);
 					p.x = client->GetPosX();
 					p.y = client->GetPosY();
-					client->SendPacket(&p);
+					client->GetSession()->SendPacket(&p);
 				}
 				if (user_info->item6 != -1) {
 					client->SetItem(5, static_cast<ITEM_TYPE>(user_info->item6 + 1), 0, true);
@@ -158,7 +158,7 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CClient* client)
 					p.item_type = static_cast<ITEM_TYPE>(user_info->item6 + 1);
 					p.x = client->GetPosX();
 					p.y = client->GetPosY();
-					client->SendPacket(&p);
+					client->GetSession()->SendPacket(&p);
 				}
 				int sectionX = client->GetPosX() / SECTION_SIZE;
 				int sectionY = client->GetPosY() / SECTION_SIZE;
@@ -180,7 +180,7 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CClient* client)
 			lock_guard<mutex> ll{ client->m_StateLock };
 			client->SetState(CL_STATE::ST_INGAME);
 		}
-		client->Send_LoginInfo_Packet();
+		client->GetSession()->SendLoginInfoPacket(client->GetID(), client->GetPosX(), client->GetPosY(), p->name, stat);
 		for (auto& pl : CNetworkMgr::GetInstance()->GetAllObject()) {
 			CClient* cl = reinterpret_cast<CClient*>(pl);
 			{
@@ -193,10 +193,10 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CClient* client)
 			if (false == client->CanSee(pl->GetID()))
 				continue;
 			if (pl->GetID() < MAX_USER)
-				cl->Send_AddObject_Packet(client->GetID());
+				cl->AddObjectToView(client->GetID());
 			else
 				reinterpret_cast<CNpc*>(pl)->WakeUp(client->GetID());
-			client->Send_AddObject_Packet(pl->GetID());
+			client->AddObjectToView(pl->GetID());
 		}
 	}
 }
@@ -204,7 +204,7 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CClient* client)
 void CPacketMgr::MovePacket(BASE_PACKET* packet, CClient* client)
 {
 	CS_MOVE_PACKET* p = reinterpret_cast<CS_MOVE_PACKET*>(packet);
-	client->last_move_time = p->move_time;
+	client->lastMoveTime = p->move_time;
 	short x = client->GetPosX();
 	short y = client->GetPosY();
 	if (GameUtil::CanMove(x, y, p->direction)) {
@@ -239,7 +239,7 @@ void CPacketMgr::MovePacket(BASE_PACKET* packet, CClient* client)
 
 		unordered_set<int> near_list = client->CheckSection();
 
-		client->Send_Move_Packet(client->GetID());
+		client->GetSession()->SendMovePacket(client->GetID(), x, y, p->move_time);
 
 		for (auto& pl : near_list) {
 			CObject* cpl = CNetworkMgr::GetInstance()->GetCObject(pl);
@@ -248,11 +248,11 @@ void CPacketMgr::MovePacket(BASE_PACKET* packet, CClient* client)
 				cpl->m_ViewLock.lock_shared();
 				if (cpl->GetViewList().count(client->GetID())) {
 					cpl->m_ViewLock.unlock_shared();
-					cl->Send_Move_Packet(client->GetID());
+					cl->GetSession()->SendMovePacket(client->GetID(), x, y, p->move_time);
 				}
 				else {
 					cpl->m_ViewLock.unlock_shared();
-					cl->Send_AddObject_Packet(client->GetID());
+					cl->AddObjectToView(client->GetID());
 				}
 			}
 			else {
@@ -260,14 +260,14 @@ void CPacketMgr::MovePacket(BASE_PACKET* packet, CClient* client)
 			}
 
 			if (old_vlist.count(pl) == 0)
-				client->Send_AddObject_Packet(pl);
+				client->AddObjectToView(pl);
 		}
 
 		for (auto& pl : old_vlist) {
 			if (0 == near_list.count(pl)) {
-				client->Send_RemoveObject_Packet(pl);
+				client->RemoveObjectFromView(pl);
 				if (pl < MAX_USER)
-					reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->Send_RemoveObject_Packet(client->GetID());
+					reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->RemoveObjectFromView(client->GetID());
 				else {
 					reinterpret_cast<CNpc*>(CNetworkMgr::GetInstance()->GetCObject(pl))->RemoveClient(client->GetID());
 				}
@@ -292,7 +292,7 @@ void CPacketMgr::AttackPacket(BASE_PACKET* packet, CClient* client)
 {
 	CS_ATTACK_PACKET* p = reinterpret_cast<CS_ATTACK_PACKET*>(packet);
 	client->UseSkill(static_cast<int>(p->skill));
-	client->Send_StatChange_Packet();
+	client->GetSession()->SendStatChangePacket(reinterpret_cast<CClientStat*>(client->GetStat()));
 }
 
 void CPacketMgr::UseItemPacket(BASE_PACKET* packet, CClient* client)
@@ -311,7 +311,7 @@ bool CPacketMgr::CheckLoginFail(char* name)
 		if (client->GetState() == CL_STATE::ST_INGAME) {
 			client->m_StateLock.unlock();
 			if (!strcmp(client->GetName(), name)) {
-				client->Send_LoginFail_Packet();
+				client->GetSession()->SendLoginFailPacket();
 				return true;
 			}
 		}
