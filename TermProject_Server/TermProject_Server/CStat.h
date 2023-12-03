@@ -13,6 +13,7 @@ public:
 	int GetPower() const { return m_power; }
 
 	void HealHp(int heal);
+	virtual bool Damaged(int power);
 
 protected:
 	mutex m_hpLock;
@@ -41,7 +42,7 @@ public:
 
 	void GainExp(int exp);
 	void HealMp(int heal);
-	bool Damaged(int power);
+	bool Damaged(int power) override;
 
 private:
 	int m_maxExp;

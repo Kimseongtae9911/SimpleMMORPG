@@ -37,8 +37,11 @@
     <Filter Include="소스 파일\Object\CNpc">
       <UniqueIdentifier>{ef04aaf3-c0a4-418c-b74e-93544bfdb72f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="소스 파일\Object\Client\Stat">
+    <Filter Include="소스 파일\Object\Stat">
       <UniqueIdentifier>{e5bbe50c-b72f-4595-8880-9a12170ddb44}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Object\Client\Skill">
+      <UniqueIdentifier>{04f7bd04-02f5-43fe-abb2-89f7f0617666}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -85,10 +88,16 @@
       <Filter>소스 파일\Object\CNpc</Filter>
     </ClInclude>
     <ClInclude Include="CStat.h">
-      <Filter>소스 파일\Object\Client\Stat</Filter>
+      <Filter>소스 파일\Object\Stat</Filter>
     </ClInclude>
     <ClInclude Include="ChatUtil.h">
       <Filter>소스 파일\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="CItemGenerator.h">
+      <Filter>소스 파일\Object\Item</Filter>
+    </ClInclude>
+    <ClInclude Include="CSkill.h">
+      <Filter>소스 파일\Object\Client\Skill</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -132,10 +141,16 @@
       <Filter>소스 파일\Object\CNpc</Filter>
     </ClCompile>
     <ClCompile Include="CStat.cpp">
-      <Filter>소스 파일\Object\Client\Stat</Filter>
+      <Filter>소스 파일\Object\Stat</Filter>
     </ClCompile>
     <ClCompile Include="ChatUtil.cpp">
       <Filter>소스 파일\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="CItemGenerator.cpp">
+      <Filter>소스 파일\Object\Item</Filter>
+    </ClCompile>
+    <ClCompile Include="CSkill.cpp">
+      <Filter>소스 파일\Object\Client\Skill</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

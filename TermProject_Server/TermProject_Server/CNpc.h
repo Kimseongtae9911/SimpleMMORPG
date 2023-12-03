@@ -31,7 +31,7 @@ public:
 	virtual unordered_set<int> CheckSection();
 	void RemoveClient(int id);
 
-	void Damaged(int power) override;
+	bool Damaged(int power, int attackID) override;
 
 private:
 	bool AStar(int startX, int startY, int destX, int destY, int* resultx, int* resulty);

@@ -291,32 +291,8 @@ void CPacketMgr::LogoutPacket(BASE_PACKET* packet, CClient* client)
 void CPacketMgr::AttackPacket(BASE_PACKET* packet, CClient* client)
 {
 	CS_ATTACK_PACKET* p = reinterpret_cast<CS_ATTACK_PACKET*>(packet);
-	if (client->CanUse(p->skill, p->time)) {
-		CClientStat* stat = reinterpret_cast<CClientStat*>(client->GetStat());
-		switch (p->skill) {
-		case 0:
-			client->Attack();
-			break;
-		case 1:
-			if (false == client->GetPowerUp()) {
-				client->Skill1();
-				stat->SetMp(stat->GetMp() - 15);
-				stat->SetPower(stat->GetPower() * 2);
-				client->Send_StatChange_Packet();
-			}
-			break;
-		case 2:
-			client->Skill2();
-			stat->SetMp(stat->GetMp() - 5);
-			client->Send_StatChange_Packet();
-			break;
-		case 3:
-			client->Skill3();
-			stat->SetMp(stat->GetMp() - 10);
-			client->Send_StatChange_Packet();
-			break;
-		}
-	}
+	client->UseSkill(static_cast<int>(p->skill));
+	client->Send_StatChange_Packet();
 }
 
 void CPacketMgr::UseItemPacket(BASE_PACKET* packet, CClient* client)

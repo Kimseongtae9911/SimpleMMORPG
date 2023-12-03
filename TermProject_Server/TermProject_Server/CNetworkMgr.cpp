@@ -142,7 +142,7 @@ void CNetworkMgr::TimerFunc()
 		if (true == m_timerQueue.try_pop(ev)) {
 			if (ev.wakeup_time > current_time) {
 				m_timerQueue.push(ev);
-				this_thread::sleep_for(1ms);
+				this_thread::yield();
 				continue;
 			}
 			switch (ev.event_id) {
@@ -166,11 +166,38 @@ void CNetworkMgr::TimerFunc()
 				PostQueuedCompletionStatus(m_iocp, 1, ev.obj_id, &ov->m_over);
 				break;
 			}
+			case EV_POWERUP_ROLLBACK: {
+				COverlapEx* ov = new COverlapEx;
+				ov->m_comp_type = OP_TYPE::OP_POWERUP_ROLLBACK;
+				ov->m_ai_target_obj = ev.target_id;
+				PostQueuedCompletionStatus(m_iocp, 1, ev.obj_id, &ov->m_over);
+				break;
+			}
 			}
 			continue;
 		}
-		this_thread::sleep_for(1ms);
+		this_thread::yield();
 	}
+}
+
+vector<int> CNetworkMgr::GetClientsCanSeeNpc(int npcID)
+{
+	vector<int> chatClients;
+	for (auto& obj : CNetworkMgr::GetInstance()->GetAllObject()) {
+		CClient* clObj = reinterpret_cast<CClient*>(obj);
+		clObj->m_StateLock.lock();
+		if (CL_STATE::ST_INGAME != clObj->GetState()) {
+			clObj->m_StateLock.unlock();
+			continue;
+		}
+		clObj->m_StateLock.unlock();
+		if (obj->GetID() >= MAX_USER)
+			break;
+		if (obj->CanSee(npcID))
+			chatClients.emplace_back(obj->GetID());
+	}
+
+	return chatClients;
 }
 
 void CNetworkMgr::Accept(int id, int bytes, COverlapEx* over_ex)
@@ -271,6 +298,12 @@ void CNetworkMgr::NpcMove(int id, int bytes, COverlapEx* over_ex)
 		dynamic_cast<CNpc*>(m_objects[id])->m_active = false;
 	}
 	delete over_ex;
+}
+
+void CNetworkMgr::PowerUpRollBack(int id, int bytes, COverlapEx* over_ex)
+{
+	CClient* client = reinterpret_cast<CClient*>(m_objects[id]);
+	m_objects[id]->GetStat()->SetPower(m_objects[id]->GetStat()->GetPower() - over_ex->m_ai_target_obj);
 }
 
 void CNetworkMgr::Recv(int id, int bytes, COverlapEx* over_ex)

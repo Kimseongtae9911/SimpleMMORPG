@@ -10,6 +10,21 @@ void CStat::HealHp(int heal)
 	m_hpLock.unlock();
 }
 
+bool CStat::Damaged(int power)
+{
+	m_hpLock.lock();
+	m_curHp -= power;
+	if (m_curHp <= 0) {
+		m_curHp = 0;
+		m_hpLock.unlock();
+		return true;
+	}
+	else {
+		m_hpLock.unlock();
+		return false;
+	}
+}
+
 void CClientStat::GainExp(int exp)
 {
 	m_exp += exp;
@@ -26,6 +41,7 @@ void CClientStat::GainExp(int exp)
 		m_curHp = m_maxHp;
 		m_maxMp = m_level * 50;
 		m_curMp = m_maxMp;
+		m_power += 15;
 	}
 }
 

@@ -20,13 +20,15 @@ public:
 
 	CDatabase* GetDatabase() const { return m_database; }
 
-	void RegisterEvent(TIMER_EVENT& ev) { m_timerQueue.push(ev); }
-
+	void RegisterEvent(const TIMER_EVENT& ev) { m_timerQueue.push(ev); }
+	vector<int> GetClientsCanSeeNpc(int npcID);
+	
 private:
 	void Accept(int id, int bytes, COverlapEx* over_ex);
 	void MonsterRespawn(int id, int bytes, COverlapEx* over_ex);
 	void PlayerHeal(int id, int bytes, COverlapEx* over_ex);
 	void NpcMove(int id, int bytes, COverlapEx* over_ex);
+	void PowerUpRollBack(int id, int bytes, COverlapEx* over_ex);
 	void Recv(int id, int bytes, COverlapEx* over_ex);
 	void Send(int id, int bytes, COverlapEx* over_ex);
 

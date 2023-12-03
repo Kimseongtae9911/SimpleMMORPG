@@ -21,3 +21,45 @@ void ChatUtil::SendDamageMsg(int targetID, int power, char* name)
 		otherClient->Send_Chat_Packet(i, msg);
 	}
 }
+
+void ChatUtil::SendNpcDamageMsg(int npcID, int clientID)
+{
+	vector<int> chatClients = CNetworkMgr::GetInstance()->GetClientsCanSeeNpc(npcID);
+
+	CObject* npc = CNetworkMgr::GetInstance()->GetCObject(npcID);
+	CObject* client = CNetworkMgr::GetInstance()->GetCObject(clientID);
+
+	for (const auto id : chatClients) {
+		CClient* otherClient = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(id));
+		otherClient->Send_Damage_Packet(npcID, 3);
+		char msg[CHAT_SIZE];
+		if (id == clientID) {
+			sprintf_s(msg, CHAT_SIZE, "Damaged %d at %s", client->GetStat()->GetPower() * 2, npc->GetName());
+		}
+		else {
+			sprintf_s(msg, CHAT_SIZE, "%s Damaged %d at %s", client->GetName(), client->GetStat()->GetPower() * 2, npc->GetName());
+		}
+		otherClient->Send_Chat_Packet(id, msg);
+	}
+}
+
+void ChatUtil::SendNpcKillMsg(int npcID, int exp, int clientID)
+{
+	vector<int> chatClients = CNetworkMgr::GetInstance()->GetClientsCanSeeNpc(npcID);
+	
+	CObject* npc = CNetworkMgr::GetInstance()->GetCObject(npcID);
+	CObject* client = CNetworkMgr::GetInstance()->GetCObject(clientID);
+
+	for (const auto id : chatClients) {
+		CClient* otherClient = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(id));
+		otherClient->Send_RemoveObject_Packet(npcID);
+		char msg[CHAT_SIZE];
+		if (id == clientID) {
+			sprintf_s(msg, CHAT_SIZE, "Obtained %dExp by killing %s", exp, npc->GetName());
+		}
+		else {
+			sprintf_s(msg, CHAT_SIZE, "%s Killed %s", client->GetName(), npc->GetName());
+		}
+		otherClient->Send_Chat_Packet(id, msg);
+	}
+}

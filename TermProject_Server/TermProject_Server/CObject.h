@@ -1,12 +1,6 @@
 #pragma once
 #include "CStat.h"
 
-#define ATTACK_COOL 1.f
-#define SKILL1_COOL 20.f
-#define SKILL2_COOL 5.f
-#define SKILL3_COOL 7.f
-#define POWERUP_TIME 10.f
-
 class CObject
 {
 public:
@@ -31,7 +25,7 @@ public:
 	const bool CanSee(int to) const;
 	
 	virtual unordered_set<int> CheckSection() { return {}; }
-	virtual void Damaged(int power) = 0;
+	virtual bool Damaged(int power, int attackID) = 0;
 
 public:
 	mutex m_StateLock;

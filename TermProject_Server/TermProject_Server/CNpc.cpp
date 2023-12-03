@@ -5,6 +5,8 @@
 #include "LuaFunc.h"
 #include "CNetworkMgr.h"
 #include "CClient.h"
+#include "CItemGenerator.h"
+#include "ChatUtil.h"
 
 CNpc::CNpc(int id)
 {
@@ -33,7 +35,7 @@ void CNpc::Attack()
 	if (m_active == false)
 		return;
 
-	CNetworkMgr::GetInstance()->GetCObject(m_target)->Damaged(m_stat->GetPower());
+	CNetworkMgr::GetInstance()->GetCObject(m_target)->Damaged(m_stat->GetPower(), m_ID);
 	
 	ChatUtil::SendDamageMsg(m_target, m_stat->GetPower(), m_name);
 }
@@ -277,8 +279,41 @@ void CNpc::RemoveClient(int id)
 	m_ViewLock.unlock();
 }
 
-void CNpc::Damaged(int power)
+bool CNpc::Damaged(int power, int attackID)
 {
+	if (!m_active || m_die)
+		return false;
+
+	if (m_stat->Damaged(power)) {
+		CClient* client = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(attackID));
+		m_die = true;
+		CNetworkMgr::GetInstance()->RegisterEvent({ m_ID, chrono::system_clock::now() + 30s, EV_MONSTER_RESPAWN, 0 });
+
+		int exp = m_stat->GetLevel() * m_stat->GetLevel() * 2;
+		if (m_monType == MONSTER_TYPE::AGRO)
+			exp *= 2;
+		reinterpret_cast<CClientStat*>(client->GetStat())->GainExp(exp);
+		client->Send_StatChange_Packet();
+
+		ChatUtil::SendNpcKillMsg(m_ID, exp, attackID);
+
+		ITEM_TYPE itemType = CItemGenerator::GetInstance()->CreateItem(client->GetPosX(), client->GetPosY());
+		if (ITEM_TYPE::NONE != itemType) {
+			SC_ITEM_ADD_PACKET p;
+			p.type = SC_ITEM_ADD;
+			p.size = sizeof(p);
+			p.x = m_PosX;
+			p.y = m_PosY;
+			p.item_type = static_cast<int>(itemType);
+			GameUtil::SetItemTile(m_PosY, m_PosX, itemType);
+			client->SendPacket(&p);
+		}
+
+		return true;
+	}	
+
+	ChatUtil::SendNpcDamageMsg(m_ID, attackID);
+	return false;
 }
 
 bool CNpc::AStar(int startX, int startY, int destX, int destY, int* resultx, int* resulty)
