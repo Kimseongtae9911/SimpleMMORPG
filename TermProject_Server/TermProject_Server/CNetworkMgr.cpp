@@ -6,6 +6,7 @@
 #include "CNpc.h"
 #include "CDatabase.h"
 #include "COverlapEx.h"
+#include "OverlapPool.h"
 
 std::unique_ptr<CNetworkMgr> CNetworkMgr::m_instance;
 
@@ -35,6 +36,11 @@ bool CNetworkMgr::Initialize()
 		for (int i = 0; i < MAX_USER; ++i) {
 			m_objects[i] = new CClient();
 		}
+
+		for (int i = 0; i < MAX_USER * 2; ++i) {
+			OverlapPool::RegisterToPool(new COverlapEx());
+		}
+
 		cout << "Initialize NPC Start" << endl;
 		for (int i = MAX_USER; i < MAX_USER + MAX_NPC; ++i) {
 			m_objects[i] = new CNpc(i);
@@ -108,26 +114,26 @@ void CNetworkMgr::WorkerFunc()
 		ULONG_PTR key;
 		WSAOVERLAPPED* over = nullptr;
 		BOOL ret = GetQueuedCompletionStatus(m_iocp, &num_bytes, &key, &over, INFINITE);
-		COverlapEx* ex_over = reinterpret_cast<COverlapEx*>(over);
+		COverlapEx* over_ex = reinterpret_cast<COverlapEx*>(over);
 		if (FALSE == ret) {
-			if (ex_over->m_comp_type == OP_TYPE::OP_ACCEPT) cout << "Accept Error";
+			if (over_ex->m_comp_type == OP_TYPE::OP_ACCEPT) cout << "Accept Error";
 			else {
 				cout << "GQCS Error on client[" << key << "]\n";
 				Disconnect(static_cast<int>(key));
-				if (ex_over->m_comp_type == OP_TYPE::OP_SEND) delete ex_over;
+				if (over_ex->m_comp_type == OP_TYPE::OP_SEND) OverlapPool::RegisterToPool(over_ex);
 				continue;
 			}
 		}
 
-		if ((0 == num_bytes) && ((ex_over->m_comp_type == OP_TYPE::OP_RECV) || (ex_over->m_comp_type == OP_TYPE::OP_SEND))) {
+		if ((0 == num_bytes) && ((over_ex->m_comp_type == OP_TYPE::OP_RECV) || (over_ex->m_comp_type == OP_TYPE::OP_SEND))) {
 			Disconnect(static_cast<int>(key));
-			if (ex_over->m_comp_type == OP_TYPE::OP_SEND) delete ex_over;
+			if (over_ex->m_comp_type == OP_TYPE::OP_SEND) OverlapPool::RegisterToPool(over_ex);
 			continue;
 		}
 
-		auto iter = m_iocpfunc.find(ex_over->m_comp_type);
+		auto iter = m_iocpfunc.find(over_ex->m_comp_type);
 		if (iter != m_iocpfunc.end()) {
-			iter->second(static_cast<int>(key), num_bytes, ex_over);
+			iter->second(static_cast<int>(key), num_bytes, over_ex);
 		}
 		else
 			cout << "Wrong IOCP Operation" << endl;
@@ -149,25 +155,25 @@ void CNetworkMgr::TimerFunc()
 			case EV_RANDOM_MOVE:
 			case EV_CHASE_PLAYER:
 			case EV_ATTACK_PLAYER: {
-				COverlapEx* ov = new COverlapEx;
+				COverlapEx* ov = OverlapPool::GetOverlapFromPool();
 				ov->m_comp_type = OP_TYPE::OP_NPC_MOVE;
 				PostQueuedCompletionStatus(m_iocp, 1, ev.obj_id, &ov->m_over);
 				break;
 			}
 			case EV_PLAYER_HEAL: {
-				COverlapEx* ov = new COverlapEx;
+				COverlapEx* ov = OverlapPool::GetOverlapFromPool();
 				ov->m_comp_type = OP_TYPE::OP_PLAYER_HEAL;
 				PostQueuedCompletionStatus(m_iocp, 1, ev.obj_id, &ov->m_over);
 				break;
 			}
 			case EV_MONSTER_RESPAWN: {
-				COverlapEx* ov = new COverlapEx;
+				COverlapEx* ov = OverlapPool::GetOverlapFromPool();
 				ov->m_comp_type = OP_TYPE::OP_MONSTER_RESPAWN;
 				PostQueuedCompletionStatus(m_iocp, 1, ev.obj_id, &ov->m_over);
 				break;
 			}
 			case EV_POWERUP_ROLLBACK: {
-				COverlapEx* ov = new COverlapEx;
+				COverlapEx* ov = OverlapPool::GetOverlapFromPool();
 				ov->m_comp_type = OP_TYPE::OP_POWERUP_ROLLBACK;
 				ov->m_ai_target_obj = ev.target_id;
 				PostQueuedCompletionStatus(m_iocp, 1, ev.obj_id, &ov->m_over);
@@ -250,54 +256,8 @@ void CNetworkMgr::PlayerHeal(int id, int bytes, COverlapEx* over_ex)
 
 void CNetworkMgr::NpcMove(int id, int bytes, COverlapEx* over_ex)
 {
-	if (true == reinterpret_cast<CNpc*>(m_objects[id])->GetDie()) {
-		delete over_ex;
-		return;
-	}
-
-	bool keep_alive = false;
-	bool chase = false;
-	bool attack = false;
-
-	for (int j = 0; j < MAX_USER; ++j) {
-		if (m_objects[id]->CanSee(j)) {
-			keep_alive = true;
-			if (MONSTER_TYPE::AGRO == reinterpret_cast<CNpc*>(m_objects[id])->GetMonType() && reinterpret_cast<CNpc*>(m_objects[id])->Agro(j)) {
-				chase = true;
-				if (abs(m_objects[j]->GetPosX() - m_objects[static_cast<int>(id)]->GetPosX()) + abs(m_objects[j]->GetPosY() - m_objects[static_cast<int>(id)]->GetPosY()) <= 1) {
-					attack = true;
-				}
-			}
-			else {
-				// Peace 몬스터 처리
-			}
-			break;
-		}
-	}
-	if (true == keep_alive) {
-		CNpc* npc = reinterpret_cast<CNpc*>(m_objects[id]);
-		if (true == attack) {
-			npc->Attack();
-			TIMER_EVENT ev{ id, chrono::system_clock::now() + 1s, EV_ATTACK_PLAYER, npc->GetTarget() };
-			m_timerQueue.push(ev);
-		}
-		else if (true == chase) {
-			npc->SetChase(true);
-			npc->Chase();
-			TIMER_EVENT ev{ id, chrono::system_clock::now() + 1s, EV_CHASE_PLAYER, npc->GetTarget() };
-			m_timerQueue.push(ev);
-		}
-		else {
-			npc->SetChase(false);
-			npc->RandomMove();
-			TIMER_EVENT ev{ id, chrono::system_clock::now() + 1s, EV_RANDOM_MOVE, 0 };
-			m_timerQueue.push(ev);
-		}
-	}
-	else {
-		dynamic_cast<CNpc*>(m_objects[id])->m_active = false;
-	}
-	delete over_ex;
+	m_objects[id]->Update();
+	OverlapPool::RegisterToPool(over_ex);
 }
 
 void CNetworkMgr::PowerUpRollBack(int id, int bytes, COverlapEx* over_ex)
@@ -332,7 +292,7 @@ void CNetworkMgr::Recv(int id, int bytes, COverlapEx* over_ex)
 
 void CNetworkMgr::Send(int id, int bytes, COverlapEx* over_ex)
 {
-	delete over_ex;
+	OverlapPool::RegisterToPool(over_ex);
 }
 
 int CNetworkMgr::GetNewID()

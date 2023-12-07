@@ -30,6 +30,8 @@ extern "C" {
 #pragma comment (lib, "lua54.lib")
 
 #define DATABASE
+#define WITH_VIEW
+#define WITH_SECTION
 
 using namespace std;
 
@@ -64,6 +66,8 @@ enum class DIR {LEFT, RIGHT, UP, DOWN};
 enum class OP_TYPE { OP_ACCEPT, OP_RECV, OP_SEND, OP_NPC_MOVE, OP_PLAYER_HEAL, OP_MONSTER_RESPAWN, OP_POWERUP_ROLLBACK};
 
 enum class CL_STATE {ST_FREE, ST_ALLOC, ST_INGAME};
+
+enum class NPC_STATE {PATROL, CHASE, ATTACK};
 
 enum ITEM_TYPE { NONE, MONEY, HP_POTION, MP_POTION, WAND, CLOTH, RING, HAT };
 

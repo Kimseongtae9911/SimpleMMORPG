@@ -10,10 +10,10 @@ public:
 	void SetCreateTime(chrono::system_clock::time_point time) { m_createTime = time; }
 	void SetNum(int num) { m_num = num; }
 
-	const ITEM_TYPE GetItemType() const { return m_itemType; }
-	const bool GetEnable() const { return m_enable; }
+	ITEM_TYPE GetItemType() const { return m_itemType; }
+	bool GetEnable() const { return m_enable; }
 	const chrono::system_clock::time_point GetCreateTime() const { return m_createTime; }
-	const int GetNum() const { return m_num; }
+	int GetNum() const { return m_num; }
 
 private:
 	ITEM_TYPE m_itemType;

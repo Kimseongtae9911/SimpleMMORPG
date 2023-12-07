@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "CSession.h"
 #include "CStat.h"
+#include "OverlapPool.h"
 
 CSession::CSession()
 {
@@ -30,7 +31,8 @@ void CSession::RecvPacket()
 
 void CSession::SendPacket(void* packet)
 {
-	COverlapEx* sdata = new COverlapEx{ reinterpret_cast<char*>(packet) };
+	COverlapEx* sdata = OverlapPool::GetOverlapFromPool();
+	sdata->Initialize(reinterpret_cast<BASE_PACKET*>(packet));
 	WSASend(m_socket, &sdata->m_Wsabuf, 1, 0, 0, &sdata->m_over, 0);
 }
 

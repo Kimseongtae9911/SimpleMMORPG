@@ -23,6 +23,9 @@ CNpc::CNpc(int id)
 	lua_register(L, "API_SendMessage", API_SendMessage);
 	lua_register(L, "API_get_x", API_get_x);
 	lua_register(L, "API_get_y", API_get_y);
+
+	m_active = false;
+	m_die = false;
 }
 
 CNpc::~CNpc()
@@ -31,50 +34,67 @@ CNpc::~CNpc()
 
 void CNpc::Attack()
 {
-	if (m_active == false)
-		return;
+	CObject* target = CNetworkMgr::GetInstance()->GetCObject(m_target);
+	if (abs(m_PosX - target->GetPosX()) + abs(m_PosY - target->GetPosY()) > 1) {
+		if (!Agro(m_target)) {
+			m_state = NPC_STATE::PATROL;
+		}
+		else
+			m_state = NPC_STATE::CHASE;
+	}
+	else {
+		target->Damaged(m_stat->GetPower(), m_ID);
 
-	CNetworkMgr::GetInstance()->GetCObject(m_target)->Damaged(m_stat->GetPower(), m_ID);
-	
-	ChatUtil::SendDamageMsg(m_target, m_stat->GetPower(), m_name);
+		ChatUtil::SendDamageMsg(m_target, m_stat->GetPower(), m_name);
+	}
 }
 
 void CNpc::Chase()
 {
-	unordered_set<int> old_vl;
-	for (auto& obj : CNetworkMgr::GetInstance()->GetAllObject()) {
-		if (CL_STATE::ST_INGAME != reinterpret_cast<CClient*>(obj)->GetState())
-			continue;
-		if (obj->GetID() >= MAX_USER)
-			break;
-		if (true == CanSee(obj->GetID()))
-			old_vl.insert(obj->GetID());
+	CObject* target = CNetworkMgr::GetInstance()->GetCObject(m_target);
+	if (!Agro(m_target)) {
+		m_state = NPC_STATE::PATROL;
+		return;
 	}
 
 	int x = 0;
 	int y = 0;
-	if (AStar(m_PosX, m_PosY, CNetworkMgr::GetInstance()->GetCObject(m_target)->GetPosX(), CNetworkMgr::GetInstance()->GetCObject(m_target)->GetPosY(), &x, &y))
+	if (AStar(m_PosX, m_PosY, target->GetPosX(), target->GetPosY(), &x, &y))
 	{
-		m_PosX = x;
-		m_PosY = y;
+		if (GameUtil::CanMove(x, y)) {
+			m_PosX = x;
+			m_PosY = y;
+		}
 	}
-	else
+	else {
+		m_state = NPC_STATE::PATROL;
 		return;
+	}
 
-	// 움직인 이후에 해당 NPC가 시야에 있는 플레이어들
-	unordered_set<int> new_vl;
+	if (abs(m_PosX - target->GetPosX()) + abs(m_PosY - target->GetPosY()) <= 1) {
+		m_state = NPC_STATE::ATTACK;
+	}
+
+#ifdef WITH_VIEW
+#ifdef WITH_SECTION
+	ViewListUpdate(CheckSection());
+#else
+	m_ViewLock.lock_shared();
+	unordered_set<int> viewList = m_viewList;
+	m_ViewLock.unlock_shared();
+	unordered_set<int> newView;
+
 	for (auto& obj : CNetworkMgr::GetInstance()->GetAllObject()) {
-		if (CL_STATE::ST_INGAME != reinterpret_cast<CClient*>(obj)->GetState())
-			continue;
 		if (obj->GetID() >= MAX_USER)
 			continue;
+		if (CL_STATE::ST_INGAME != reinterpret_cast<CClient*>(obj)->GetState())
+			continue;
 		if (true == CanSee(obj->GetID()))
-			new_vl.insert(obj->GetID());
+			newView.insert(obj->GetID());
 	}
-
-	for (auto pl : new_vl) {
+	for (auto pl : newView) {
 		// new_vl에는 있는데 old_vl에는 없을 때 플레이어의 시야에 등장
-		if (0 == old_vl.count(pl)) {
+		if (0 == viewList.count(pl)) {
 			reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->AddObjectToView(m_ID);
 		}
 		else {
@@ -84,8 +104,8 @@ void CNpc::Chase()
 		}
 	}
 
-	for (auto pl : old_vl) {
-		if (0 == new_vl.count(pl)) {
+	for (auto pl : viewList) {
+		if (0 == newView.count(pl)) {
 			CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.lock_shared();
 			if (0 != CNetworkMgr::GetInstance()->GetCObject(pl)->GetViewList().count(m_ID)) {
 				CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.unlock_shared();
@@ -96,67 +116,134 @@ void CNpc::Chase()
 			}
 		}
 	}
+
+	m_ViewLock.lock();
+	m_viewList = newView;
+	m_ViewLock.unlock();
+#endif
+#else
+	for (auto& obj : CNetworkMgr::GetInstance()->GetAllObject()) {
+		if (obj->GetID() >= MAX_USER)
+			break;
+		CClient* cl = reinterpret_cast<CClient*>(obj);
+		if (cl->GetState() != CL_STATE::ST_INGAME)
+			continue;
+		cl->GetSession()->SendMovePacket(m_ID, x, y, lastMoveTime);
+	}
+#endif
 }
 
 void CNpc::RandomMove()
 {
-	m_ViewLock.lock_shared();
-	unordered_set<int> old_vl = m_viewList;
-	m_ViewLock.unlock_shared();
-
 	int x = m_PosX;
 	int y = m_PosY;
-	int dir = rand() % 4;
-	if (GameUtil::CanMove(x, y, dir)) {
-		switch (dir) {
-		case 0:	y--; break;
-		case 1:	y++; break;
-		case 2:	x--; break;
-		case 3:	x++; break;
-		}
-		SetPos(x, y);
-		int sectionX = static_cast<int>(x / SECTION_SIZE);
-		int sectionY = static_cast<int>(y / SECTION_SIZE);
-		if (m_sectionX != sectionX || m_sectionY != sectionY) {
-			GameUtil::RegisterToSection(sectionY, sectionX, m_ID);
-			m_sectionX = sectionX;
-			m_sectionY = sectionY;
-		}
+	switch (rand() % 4) {
+	case 0:	y--; break;
+	case 1:	y++; break;
+	case 2:	x--; break;
+	case 3:	x++; break;
 	}
 
-	// 움직인 이후에 해당 NPC가 시야에 있는 플레이어들
-	unordered_set<int> new_vl = CheckSection();
+	if (!GameUtil::CanMove(x, y))
+		return;
+	
+	SetPos(x, y);
+#ifdef WITH_VIEW
+#ifdef WITH_SECTION
+	int sectionX = static_cast<int>(x / SECTION_SIZE);
+	int sectionY = static_cast<int>(y / SECTION_SIZE);
+	if (m_sectionX != sectionX || m_sectionY != sectionY) {
+		GameUtil::RegisterToSection(m_sectionX, m_sectionY, sectionY, sectionX, m_ID);
+		m_sectionX = sectionX;
+		m_sectionY = sectionY;
+	}
 
-	for (auto pl : new_vl) {
+	unordered_set<int> viewList = CheckSection();
+	if (viewList.size() == 0) {
+		m_active = false;
+		return;
+	}
+
+	for (int id : viewList) {
+		CClient* client = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(id));
+		client->GetSession()->SendMovePacket(m_ID, m_PosX, m_PosY, lastMoveTime);
+		if (MONSTER_TYPE::AGRO == m_monType && Agro(id)) {
+			m_target = id;
+			m_state = NPC_STATE::CHASE;
+			break;
+		}
+		else {
+			// Peace 몬스터 처리
+		}
+	}
+	
+	ViewListUpdate(viewList);
+#else
+	m_ViewLock.lock_shared();
+	unordered_set<int> viewList = m_viewList;
+	m_ViewLock.unlock_shared();
+	unordered_set<int> newView;
+
+	for (auto& obj : CNetworkMgr::GetInstance()->GetAllObject()) {
+		if (obj->GetID() >= MAX_USER)
+			continue;
+		if (CL_STATE::ST_INGAME != reinterpret_cast<CClient*>(obj)->GetState())
+			continue;
+		if (true == CanSee(obj->GetID()))
+			newView.insert(obj->GetID());
+}
+	for (auto pl : newView) {
 		// new_vl에는 있는데 old_vl에는 없을 때 플레이어의 시야에 등장
-		if (0 == old_vl.count(pl)) {
+		if (0 == viewList.count(pl)) {
 			reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->AddObjectToView(m_ID);
-			m_ViewLock.lock();
-			m_viewList.insert(pl);
-			m_ViewLock.unlock();
 		}
 		else {
 			// 플레이어가 계속 보고 있음.
 			CClient* client = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl));
 			client->GetSession()->SendMovePacket(m_ID, x, y, client->lastMoveTime);
+			if (MONSTER_TYPE::AGRO == m_monType && Agro(pl)) {
+				m_target = pl;
+				m_state = NPC_STATE::CHASE;
+			}
 		}
 	}
 
-	for (auto pl : old_vl) {
-		if (0 == new_vl.count(pl)) {
+	for (auto pl : viewList) {
+		if (0 == newView.count(pl)) {
 			CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.lock_shared();
 			if (0 != CNetworkMgr::GetInstance()->GetCObject(pl)->GetViewList().count(m_ID)) {
 				CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.unlock_shared();
 				reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->RemoveObjectFromView(m_ID);
-				m_ViewLock.lock();
-				m_viewList.erase(pl);
-				m_ViewLock.unlock();
 			}
 			else {
 				CNetworkMgr::GetInstance()->GetCObject(pl)->m_ViewLock.unlock_shared();
 			}
 		}
 	}
+
+	m_ViewLock.lock();
+	m_viewList = newView;
+	m_ViewLock.unlock();
+#endif
+#else
+	bool active = false;
+	for (auto& obj : CNetworkMgr::GetInstance()->GetAllObject()) {
+		if (obj->GetID() >= MAX_USER)
+			break;
+		CClient* cl = reinterpret_cast<CClient*>(obj);
+		if (cl->GetState() != CL_STATE::ST_INGAME)
+			continue;
+		cl->GetSession()->SendMovePacket(m_ID, x, y, lastMoveTime);
+		if (MONSTER_TYPE::AGRO == m_monType && Agro(obj->GetID())) {
+			m_target = obj->GetID();
+			m_state = NPC_STATE::CHASE;
+		}
+		if (cl->CanSee(m_ID))
+			active = true;
+	}
+	if (!active)
+		m_active = active;
+#endif
 }
 
 bool CNpc::Agro(int to)
@@ -169,16 +256,11 @@ bool CNpc::Agro(int to)
 
 void CNpc::WakeUp(int waker)
 {
-	m_ViewLock.lock();
-	m_viewList.insert(waker);
-	m_ViewLock.unlock();
-
-	if (m_active)
+	if (m_active || m_die)
 		return;
 
-	bool old_state = false;
-	if (false == atomic_compare_exchange_strong(&m_active, &old_state, true))
-		return;
+	m_active = true;
+
 	TIMER_EVENT ev{ m_ID, chrono::system_clock::now(), EV_RANDOM_MOVE, 0 };
 	CNetworkMgr::GetInstance()->RegisterEvent(ev);
 }
@@ -273,13 +355,6 @@ unordered_set<int> CNpc::CheckSection()
 	return viewList;
 }
 
-void CNpc::RemoveClient(int id)
-{
-	m_ViewLock.lock();
-	m_viewList.erase(id);
-	m_ViewLock.unlock();
-}
-
 bool CNpc::Damaged(int power, int attackID)
 {
 	if (!m_active || m_die)
@@ -315,6 +390,26 @@ bool CNpc::Damaged(int power, int attackID)
 
 	ChatUtil::SendNpcDamageMsg(m_ID, attackID);
 	return false;
+}
+
+void CNpc::Update()
+{
+	if (m_die || !m_active) {
+		return;
+	}
+
+	if (m_state == NPC_STATE::ATTACK) {
+		Attack();
+	}
+	else if (m_state == NPC_STATE::CHASE) {
+		Chase();
+	}
+	else if (m_state == NPC_STATE::PATROL) {
+		RandomMove();
+	}
+	
+	
+	CNetworkMgr::GetInstance()->RegisterEvent({ m_ID, chrono::system_clock::now() + 1s, EV_RANDOM_MOVE, 0 });
 }
 
 bool CNpc::AStar(int startX, int startY, int destX, int destY, int* resultx, int* resulty)
@@ -445,4 +540,32 @@ void CNpc::FindPath(Node node[MONSTER_VIEW * 2 + 1][MONSTER_VIEW * 2 + 1], int d
 	s.pop();
 	*x = s.top().parentX;
 	*y = s.top().parentY;
+}
+
+void CNpc::ViewListUpdate(const unordered_set<int>& viewList)
+{
+	m_ViewLock.lock_shared();
+	unordered_set<int> oldView = m_viewList;
+	m_ViewLock.unlock_shared();
+	for (int pl : viewList) {
+		CClient* client = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl));
+		// new_vl에는 있는데 old_vl에는 없을 때 플레이어의 시야에 등장
+		if (!oldView.contains(pl)) {
+			client->AddObjectToView(m_ID);
+		}
+		else {
+			// 플레이어가 계속 보고 있음.
+			client->GetSession()->SendMovePacket(m_ID, m_PosX, m_PosY, lastMoveTime);
+		}
+	}
+
+	for (int pl : oldView) {
+		if (!viewList.contains(pl)) {
+			reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->RemoveObjectFromView(m_ID);
+		}
+	}
+
+	m_ViewLock.lock();
+	m_viewList = viewList;
+	m_ViewLock.unlock();
 }

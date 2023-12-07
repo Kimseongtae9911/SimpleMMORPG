@@ -35,61 +35,34 @@ bool GameUtil::InitailzeData()
 	return true;
 }
 
-bool GameUtil::CanMove(short x, short y, char dir)
+bool GameUtil::CanMove(short x, short y)
 {
-	bool canmove = true;
-	switch (dir) {
-	case 0:
-		if (y > 0) {
-			y--;
-			if (tilemap[y][x] != 'G' && tilemap[y][x] != 'D')
-				canmove = false;
-		}
-		else {
-			canmove = false;
-		}
-		break;
-	case 1:
-		if (y < W_HEIGHT - 1) {
-			y++;
-			if (tilemap[y][x] != 'G' && tilemap[y][x] != 'D')
-				canmove = false;
-		}
-		else {
-			canmove = false;
-		}
-		break;
-	case 2:
-		if (x > 0) {
-			x--;
-			if (tilemap[y][x] != 'G' && tilemap[y][x] != 'D')
-				canmove = false;
-		}
-		else {
-			canmove = false;
-		}
-		break;
-	case 3:
-		if (x < W_WIDTH - 1) {
-			x++;
-			if (tilemap[y][x] != 'G' && tilemap[y][x] != 'D')
-				canmove = false;
-		}
-		else {
-			canmove = false;
-		}
-		break;
-	}
+	if (x < 0 || x >= W_WIDTH - 1 || y < 0 || y >= W_HEIGHT - 1)
+		return false;
 
-	return canmove;
+	if (tilemap[y][x] != 'G' && tilemap[y][x] != 'D')
+		return false;
 
+	return true;
 }
 
-vector<int> GameUtil::GetSectionObjects(int x, int y)
+unordered_set<int> GameUtil::GetSectionObjects(int x, int y)
 {
 	sections[x][y].sectionLock.lock_shared();
-	vector<int> objects(sections[x][y].objects);
+	unordered_set<int> objects(sections[x][y].objects);
 	sections[x][y].sectionLock.unlock_shared();
 
 	return objects;
+}
+
+void GameUtil::RegisterToSection(int beforeX, int berforeY, int x, int y, int id)
+{
+	if (beforeX != -1) {
+		sections[x][y].sectionLock.lock();
+		sections[x][y].objects.erase(id);
+		sections[x][y].sectionLock.unlock();
+	}
+	sections[x][y].sectionLock.lock(); 
+	sections[x][y].objects.insert(id); 
+	sections[x][y].sectionLock.unlock();
 }

@@ -31,14 +31,14 @@ int API_Initialize(lua_State* L)
 	int sectionX = static_cast<int>(npc->GetPosX() / SECTION_SIZE);
 	int sectionY = static_cast<int>(npc->GetPosY() / SECTION_SIZE);
 	npc->SetSection(sectionX, sectionY);
-	GameUtil::RegisterToSection(sectionY, sectionX, id);
+	GameUtil::RegisterToSection(-1, -1, sectionY, sectionX, id);
 	int n = rand() % 5;
 	int level = (npc->GetPosX() / 100) * 5 + (npc->GetPosY() / 100) * 5 + n;
 	npc->GetStat()->SetLevel(level + 5);
 	npc->GetStat()->SetMaxHp(80 + npc->GetStat()->GetLevel() * 50);
 	npc->GetStat()->SetCurHp(npc->GetStat()->GetMaxHp());
 	npc->GetStat()->SetPower(10 + npc->GetStat()->GetLevel() * 5);
-	
+
 	if(id <= (MAX_NPC / 2) + MAX_USER)
 		npc->SetMonType(MONSTER_TYPE::AGRO);
 	else

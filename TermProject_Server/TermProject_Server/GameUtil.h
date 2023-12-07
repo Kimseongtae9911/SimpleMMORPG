@@ -5,7 +5,7 @@ constexpr int SECTION_NUM = static_cast<int>((W_WIDTH / SECTION_SIZE + 1));
 
 struct Section {
 	shared_mutex sectionLock;
-	vector<int> objects;
+	unordered_set<int> objects;
 };
 
 class GameUtil
@@ -13,14 +13,14 @@ class GameUtil
 public:
 	static bool InitailzeData();
 
-	static bool CanMove(short x, short y, char dir);
+	static bool CanMove(short x, short y);
 	
 	static char GetTile(int x, int y) { return tilemap[x][y]; }
 	static ITEM_TYPE GetItemTile(int x, int y) { return itemmap[x][y]; }
 	static void SetItemTile(int x, int y, ITEM_TYPE item) { itemmap[x][y] = item; }
 
-	static vector<int> GetSectionObjects(int x, int y);
-	static void RegisterToSection(int x, int y, int id) { sections[x][y].sectionLock.lock(); sections[x][y].objects.push_back(id); sections[x][y].sectionLock.unlock();}
+	static unordered_set<int> GetSectionObjects(int x, int y);
+	static void RegisterToSection(int beforeX, int berforeY, int x, int y, int id);
 
 private:
 	static char tilemap[W_HEIGHT][W_WIDTH];

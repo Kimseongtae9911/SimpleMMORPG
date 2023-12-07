@@ -185,6 +185,142 @@ void CClient::Heal()
 	CNetworkMgr::GetInstance()->RegisterEvent(ev);
 }
 
+void CClient::Move(char dir)
+{
+	short x = m_PosX;
+	short y = m_PosY;
+	switch (dir) {
+	case 0: {
+		y--; break;
+	}
+	case 1: {
+		y++; break;
+	}
+	case 2: {
+		x--; break;
+	}
+	case 3: {
+		x++; break;
+	}
+	}
+	if (!GameUtil::CanMove(x, y)) {
+		return;
+	}
+
+	SetPos(x, y);
+	CheckItem();
+#ifdef WITH_VIEW
+#ifdef WITH_SECTION
+	int sectionX = static_cast<int>(x / SECTION_SIZE);
+	int sectionY = static_cast<int>(y / SECTION_SIZE);
+
+	if (m_sectionX != sectionX || m_sectionY != sectionY) {
+		GameUtil::RegisterToSection(m_sectionX, m_sectionY, sectionY, sectionX, m_ID);
+		m_sectionX = sectionX;
+		m_sectionY = sectionY;
+	}
+
+	m_ViewLock.lock_shared();
+	unordered_set<int> old_vlist = m_viewList;
+	m_ViewLock.unlock_shared();
+
+	unordered_set<int> near_list = CheckSection();
+
+	m_session->SendMovePacket(m_ID, x, y, lastMoveTime);
+
+	for (auto& pl : near_list) {
+		CObject* cpl = CNetworkMgr::GetInstance()->GetCObject(pl);
+		if (pl < MAX_USER) {
+			CClient* cl = reinterpret_cast<CClient*>(cpl);
+			cpl->m_ViewLock.lock_shared();
+			if (cpl->GetViewList().count(m_ID)) {
+				cpl->m_ViewLock.unlock_shared();
+				cl->GetSession()->SendMovePacket(m_ID, x, y, lastMoveTime);
+			}
+			else {
+				cpl->m_ViewLock.unlock_shared();
+				cl->AddObjectToView(m_ID);
+			}
+		}
+		else {
+			reinterpret_cast<CNpc*>(cpl)->WakeUp(m_ID);
+		}
+
+		if (old_vlist.count(pl) == 0)
+			AddObjectToView(pl);
+	}
+
+	for (auto& pl : old_vlist) {
+		if (0 == near_list.count(pl)) {
+			RemoveObjectFromView(pl);
+			if (pl < MAX_USER)
+				reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->RemoveObjectFromView(m_ID);
+		}
+	}
+#else
+	m_ViewLock.lock_shared();
+	unordered_set<int> oldView = m_viewList;
+	m_ViewLock.unlock_shared();
+
+	unordered_set<int> nearView;
+
+	for (auto& obj : CNetworkMgr::GetInstance()->GetAllObject()) {
+		if (obj->GetID() < MAX_USER && CL_STATE::ST_INGAME != reinterpret_cast<CClient*>(obj)->GetState())
+			continue;
+		if (obj->GetID() == m_ID)
+			continue;
+		if (true == CanSee(obj->GetID()))
+			nearView.insert(obj->GetID());
+	}
+
+	m_session->SendMovePacket(m_ID, x, y, lastMoveTime);
+
+	for (auto& pl : nearView) {
+		CObject* cpl = CNetworkMgr::GetInstance()->GetCObject(pl);
+		if (pl < MAX_USER) {
+			CClient* cl = reinterpret_cast<CClient*>(cpl);
+			cpl->m_ViewLock.lock_shared();
+			if (cpl->GetViewList().count(m_ID)) {
+				cpl->m_ViewLock.unlock_shared();
+				cl->GetSession()->SendMovePacket(m_ID, x, y, lastMoveTime);
+			}
+			else {
+				cpl->m_ViewLock.unlock_shared();
+				cl->AddObjectToView(m_ID);
+			}
+		}
+		else {
+			reinterpret_cast<CNpc*>(cpl)->WakeUp(m_ID);
+		}
+
+		if (oldView.count(pl) == 0)
+			AddObjectToView(pl);
+	}
+
+	for (auto& pl : oldView) {
+		if (0 == nearView.count(pl)) {
+			RemoveObjectFromView(pl);
+			if (pl < MAX_USER)
+				reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->RemoveObjectFromView(m_ID);
+		}
+	}
+#endif
+#else
+	for (auto& obj : CNetworkMgr::GetInstance()->GetAllObject()) {
+		if (obj->GetID() >= MAX_USER) {
+			if (CanSee(obj->GetID()))
+				reinterpret_cast<CNpc*>(obj)->WakeUp(m_ID);
+		}
+		else {
+			CClient* cl = reinterpret_cast<CClient*>(obj);
+			if (cl->GetState() != CL_STATE::ST_INGAME)
+				continue;
+			cl->GetSession()->SendMovePacket(m_ID, x, y, lastMoveTime);
+		}
+	}
+#endif
+}
+
 unordered_set<int> CClient::CheckSection()
 {
 	unordered_set<int> viewList;

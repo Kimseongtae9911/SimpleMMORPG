@@ -78,18 +78,19 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CClient* client)
 
 				client->GetSession()->SendLoginInfoPacket(client->GetID(), user_info->pos_x, user_info->pos_y, p->name, stat);
 				for (auto& pl : CNetworkMgr::GetInstance()->GetAllObject()) {
-					CClient* cl = reinterpret_cast<CClient*>(pl);
-					{
-						lock_guard<mutex> ll(pl->m_StateLock);
-						if (CL_STATE::ST_INGAME != cl->GetState())
-							continue;
-					}
-					if (pl->GetID() == client->GetID())
+					if (pl->GetID() == client->GetID() || pl->GetID() == -1)
 						continue;
 					if (false == client->CanSee(pl->GetID()))
 						continue;
-					if (pl->GetID() < MAX_USER)
+					if (pl->GetID() < MAX_USER) {
+						CClient* cl = reinterpret_cast<CClient*>(pl);
+						{
+							lock_guard<mutex> ll(pl->m_StateLock);
+							if (CL_STATE::ST_INGAME != cl->GetState())
+								continue;
+						}
 						cl->AddObjectToView(client->GetID());
+					}
 					else
 						reinterpret_cast<CNpc*>(pl)->WakeUp(client->GetID());
 					client->AddObjectToView(pl->GetID());
@@ -163,7 +164,7 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CClient* client)
 				int sectionX = client->GetPosX() / SECTION_SIZE;
 				int sectionY = client->GetPosY() / SECTION_SIZE;
 				client->SetSection(sectionX, sectionY);
-				GameUtil::RegisterToSection(sectionY, sectionX, client->GetID());
+				GameUtil::RegisterToSection(-1, -1, sectionY, sectionX, client->GetID());
 			}
 		}
 	}
@@ -205,75 +206,8 @@ void CPacketMgr::MovePacket(BASE_PACKET* packet, CClient* client)
 {
 	CS_MOVE_PACKET* p = reinterpret_cast<CS_MOVE_PACKET*>(packet);
 	client->lastMoveTime = p->move_time;
-	short x = client->GetPosX();
-	short y = client->GetPosY();
-	if (GameUtil::CanMove(x, y, p->direction)) {
-		switch (p->direction) {
-		case 0: {
-			client->SetDir(DIR::UP);
-			y--; break;
-		}
-		case 1: {
-			client->SetDir(DIR::DOWN);
-			y++; break;
-		}
-		case 2: {
-			client->SetDir(DIR::LEFT);
-			x--; break;
-		}
-		case 3: {
-			client->SetDir(DIR::RIGHT);
-			x++; break;
-		}
-		}
-		client->SetPos(x, y);
-		client->CheckItem();
-		int sectionX = static_cast<int>(x / SECTION_SIZE);
-		int sectionY = static_cast<int>(y / SECTION_SIZE);
-		client->SetSection(sectionX, sectionY);
-		GameUtil::RegisterToSection(sectionY, sectionX, client->GetID());
 
-		client->m_ViewLock.lock_shared();
-		unordered_set<int> old_vlist = client->GetViewList();
-		client->m_ViewLock.unlock_shared();
-
-		unordered_set<int> near_list = client->CheckSection();
-
-		client->GetSession()->SendMovePacket(client->GetID(), x, y, p->move_time);
-
-		for (auto& pl : near_list) {
-			CObject* cpl = CNetworkMgr::GetInstance()->GetCObject(pl);
-			if (pl < MAX_USER) {
-				CClient* cl = reinterpret_cast<CClient*>(cpl);
-				cpl->m_ViewLock.lock_shared();
-				if (cpl->GetViewList().count(client->GetID())) {
-					cpl->m_ViewLock.unlock_shared();
-					cl->GetSession()->SendMovePacket(client->GetID(), x, y, p->move_time);
-				}
-				else {
-					cpl->m_ViewLock.unlock_shared();
-					cl->AddObjectToView(client->GetID());
-				}
-			}
-			else {
-				reinterpret_cast<CNpc*>(cpl)->WakeUp(client->GetID());
-			}
-
-			if (old_vlist.count(pl) == 0)
-				client->AddObjectToView(pl);
-		}
-
-		for (auto& pl : old_vlist) {
-			if (0 == near_list.count(pl)) {
-				client->RemoveObjectFromView(pl);
-				if (pl < MAX_USER)
-					reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->RemoveObjectFromView(client->GetID());
-				else {
-					reinterpret_cast<CNpc*>(CNetworkMgr::GetInstance()->GetCObject(pl))->RemoveClient(client->GetID());
-				}
-			}
-		}
-	}
+	client->Move(p->direction);
 }
 
 void CPacketMgr::ChatPacket(BASE_PACKET* packet, CClient* client)

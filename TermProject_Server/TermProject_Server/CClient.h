@@ -29,6 +29,7 @@ public:
 	void SetItem(int index, ITEM_TYPE type, int num, bool enable);
 
 	void Heal();
+	void Move(char dir);
 	
 	void AddObjectToView(int c_id);
 	void RemoveObjectFromView(int c_id);

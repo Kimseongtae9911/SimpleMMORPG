@@ -163,7 +163,7 @@
     <ClInclude Include="CStat.h" />
     <ClInclude Include="GameUtil.h" />
     <ClInclude Include="LuaFunc.h" />
-    <ClInclude Include="OverExp.h" />
+    <ClInclude Include="OverlapPool.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="protocol.h" />
   </ItemGroup>
@@ -185,7 +185,7 @@
     <ClCompile Include="GameUtil.cpp" />
     <ClCompile Include="LuaFunc.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="OverExp.cpp" />
+    <ClCompile Include="OverlapPool.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="lua54.lib" />

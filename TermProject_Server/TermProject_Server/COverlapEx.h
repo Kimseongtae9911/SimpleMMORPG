@@ -15,12 +15,22 @@ public:
 		m_comp_type = OP_TYPE::OP_RECV;
 		ZeroMemory(&m_over, sizeof(m_over));
 	}
-	COverlapEx(char* packet)
+
+	COverlapEx(BASE_PACKET* packet)
 	{
-		m_Wsabuf.len = packet[0];
+		m_Wsabuf.len = packet->size;
 		m_Wsabuf.buf = m_send_buf;
 		ZeroMemory(&m_over, sizeof(m_over));
 		m_comp_type = OP_TYPE::OP_SEND;
-		memcpy(m_send_buf, packet, packet[0]);
+		memcpy(m_send_buf, packet, packet->size);
+	}
+
+	void Initialize(BASE_PACKET* packet)
+	{
+		m_Wsabuf.len = packet->size;
+		m_Wsabuf.buf = m_send_buf;
+		ZeroMemory(&m_over, sizeof(m_over));
+		m_comp_type = OP_TYPE::OP_SEND;
+		memcpy(m_send_buf, packet, packet->size);
 	}
 };

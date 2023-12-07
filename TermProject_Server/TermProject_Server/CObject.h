@@ -26,6 +26,7 @@ public:
 	
 	virtual unordered_set<int> CheckSection() { return {}; }
 	virtual bool Damaged(int power, int attackID) = 0;
+	virtual void Update() {}
 
 public:
 	mutex m_StateLock;
