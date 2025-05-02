@@ -4,6 +4,7 @@
 #include "CItem.h"
 #include "GameUtil.h"
 #include "CNetworkMgr.h"
+#include "Global.h"
 
 CClient::CClient()
 {
@@ -220,38 +221,33 @@ void CClient::Move(char dir)
 		m_sectionY = sectionY;
 	}
 
-	m_ViewLock.lock_shared();
-	unordered_set<int> old_vlist = m_viewList;
-	m_ViewLock.unlock_shared();
-
-	unordered_set<int> near_list = CheckSection();
+	unordered_set<int> oldView = m_viewList;
+	unordered_set<int> newView = CheckSection();
 
 	m_session->SendMovePacket(m_ID, x, y, lastMoveTime);
 
-	for (auto& pl : near_list) {
+	for (auto& pl : newView) {
 		CObject* cpl = CNetworkMgr::GetInstance()->GetCObject(pl);
 		if (pl < MAX_USER) {
 			CClient* cl = reinterpret_cast<CClient*>(cpl);
-			cpl->m_ViewLock.lock_shared();
-			if (cpl->GetViewList().count(m_ID)) {
-				cpl->m_ViewLock.unlock_shared();
-				cl->GetSession()->SendMovePacket(m_ID, x, y, lastMoveTime);
-			}
-			else {
-				cpl->m_ViewLock.unlock_shared();
-				cl->AddObjectToView(m_ID);
-			}
+
+			cl->GetJobQueue().PushJob([this, cl, x, y]() {
+				// 시야에 있다면 패킷 전송, 없다면 시야에 추가
+				const auto& viewList = cl->GetViewList();
+				viewList.end() != viewList.find(m_ID) ? cl->GetSession()->SendMovePacket(m_ID, x, y, lastMoveTime) : cl->AddObjectToView(m_ID);
+				});
+			GPacketJobQueue->AddSessionQueue(cl);
 		}
 		else {
 			reinterpret_cast<CNpc*>(cpl)->WakeUp(m_ID);
 		}
 
-		if (old_vlist.count(pl) == 0)
+		if (oldView.find(pl) == oldView.end())
 			AddObjectToView(pl);
 	}
 
-	for (auto& pl : old_vlist) {
-		if (0 == near_list.count(pl)) {
+	for (auto& pl : oldView) {
+		if (newView.end() == newView.find(pl)) {
 			RemoveObjectFromView(pl);
 			if (pl < MAX_USER)
 				reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->RemoveObjectFromView(m_ID);
@@ -427,9 +423,7 @@ bool CClient::Damaged(int power, int attackID)
 
 void CClient::AddObjectToView(int c_id)
 {
-	m_ViewLock.lock();
 	m_viewList.insert(c_id);
-	m_ViewLock.unlock();
 
 	SC_ADD_OBJECT_PACKET add_packet;
 	add_packet.id = c_id;

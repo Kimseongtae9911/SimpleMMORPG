@@ -49,6 +49,12 @@
     <Filter Include="소스 파일\Database">
       <UniqueIdentifier>{84236e9d-38e0-42fc-83a6-30edccd97a85}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\JobQueue">
+      <UniqueIdentifier>{2addbf8f-671b-479a-bfe0-a4d54de1c086}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Global">
+      <UniqueIdentifier>{dd3698c1-115b-4287-a162-a58c9feb2291}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -108,6 +114,15 @@
     <ClInclude Include="OverlapPool.h">
       <Filter>소스 파일\Resource</Filter>
     </ClInclude>
+    <ClInclude Include="Job.h">
+      <Filter>소스 파일\JobQueue</Filter>
+    </ClInclude>
+    <ClInclude Include="JobQueue.h">
+      <Filter>소스 파일\JobQueue</Filter>
+    </ClInclude>
+    <ClInclude Include="Global.h">
+      <Filter>소스 파일\Global</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -163,6 +178,18 @@
     </ClCompile>
     <ClCompile Include="OverlapPool.cpp">
       <Filter>소스 파일\Resource</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Job.cpp">
+      <Filter>소스 파일\JobQueue</Filter>
+    </ClCompile>
+    <ClCompile Include="JobQueue.cpp">
+      <Filter>소스 파일\JobQueue</Filter>
+    </ClCompile>
+    <ClCompile Include="Global.cpp">
+      <Filter>소스 파일\Global</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

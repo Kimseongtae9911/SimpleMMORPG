@@ -6,6 +6,7 @@
 #include "CNetworkMgr.h"
 #include "CClient.h"
 #include "CItemGenerator.h"
+#include "Global.h"
 
 CNpc::CNpc(int id)
 {
@@ -544,28 +545,15 @@ void CNpc::FindPath(Node node[MONSTER_VIEW * 2 + 1][MONSTER_VIEW * 2 + 1], int d
 
 void CNpc::ViewListUpdate(const unordered_set<int>& viewList)
 {
-	m_ViewLock.lock_shared();
-	unordered_set<int> oldView = m_viewList;
-	m_ViewLock.unlock_shared();
-	for (int pl : viewList) {
-		CClient* client = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl));
-		// new_vl에는 있는데 old_vl에는 없을 때 플레이어의 시야에 등장
-		if (!oldView.contains(pl)) {
-			client->AddObjectToView(m_ID);
-		}
-		else {
-			// 플레이어가 계속 보고 있음.
-			client->GetSession()->SendMovePacket(m_ID, m_PosX, m_PosY, lastMoveTime);
-		}
-	}
+	for (int pl : viewList) 
+	{
+		CClient* client = static_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl));
 
-	for (int pl : oldView) {
-		if (!viewList.contains(pl)) {
-			reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->RemoveObjectFromView(m_ID);
-		}
-	}
+		client->GetJobQueue().PushJob([this, client]() {
+			const auto& viewList = client->GetViewList();
+			viewList.find(m_ID) != viewList.end() ? client->GetSession()->SendMovePacket(m_ID, m_PosX, m_PosY, lastMoveTime) : client->AddObjectToView(m_ID);
+			});
 
-	m_ViewLock.lock();
-	m_viewList = viewList;
-	m_ViewLock.unlock();
+		GPacketJobQueue->AddSessionQueue(client);
+	}
 }

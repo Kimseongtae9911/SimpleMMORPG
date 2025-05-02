@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "CServer.h"
 #include "CNetworkMgr.h"
+#include "Global.h"
+#include "JobQueue.h"
 
 CServer::CServer()
 {
@@ -28,27 +30,24 @@ bool CServer::Release()
 
 void CServer::Run()
 {
-	unsigned int threadNum = std::thread::hardware_concurrency() * 2l;
-
-	m_workers.reserve(threadNum);
-	for (unsigned int i = 0; i < threadNum - 3; ++i) {
-		m_workers.emplace_back([this]() {WorkerFunc(); });
+	m_workers.reserve(3);
+	m_networkThreads.reserve(3);
+	for (unsigned int i = 0; i < 3; ++i) {
+		m_networkThreads.emplace_back([this]() {CNetworkMgr::GetInstance()->IOCPFunc(); });
 	}
 
-	std::thread timer{ [this]() {TimerFunc(); } };
+	for (unsigned int i = 0; i < 3; ++i) {
+		m_workers.emplace_back([]() {GPacketJobQueue->ProcessJob(); });
+	}
+
+	std::thread timer{ [this]() {CNetworkMgr::GetInstance()->TimerFunc(); } };
 	timer.join();
 
-	for (unsigned int i = 0; i < threadNum - 2; ++i) {
+	for (unsigned int i = 0; i < 3; ++i) {
 		m_workers[i].join();
 	}
-}
 
-void CServer::WorkerFunc()
-{
-	CNetworkMgr::GetInstance()->WorkerFunc();
-}
-
-void CServer::TimerFunc()
-{
-	CNetworkMgr::GetInstance()->TimerFunc();
+	for (unsigned int i = 0; i < 3; ++i) {
+		m_networkThreads[i].join();
+	}
 }

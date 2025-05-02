@@ -10,10 +10,7 @@ public:
 	void Run();
 
 private:
-	void WorkerFunc();
-	void TimerFunc();
-
-private:
+	std::vector<std::thread> m_networkThreads;
 	std::vector<std::thread> m_workers;
 };
 

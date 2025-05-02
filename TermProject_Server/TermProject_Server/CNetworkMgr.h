@@ -12,7 +12,7 @@ public:
 	bool Initialize();
 	bool Release();
 
-	void WorkerFunc();
+	void IOCPFunc();
 	void TimerFunc();
 
 	CObject* GetCObject(int id) const { return m_objects[id]; }

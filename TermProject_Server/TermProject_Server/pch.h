@@ -17,6 +17,7 @@
 #include <concurrent_priority_queue.h>
 #include <unordered_map>
 #include <functional>
+#include <memory>
 #include "protocol.h"
 
 extern "C" {
@@ -29,7 +30,7 @@ extern "C" {
 #pragma comment(lib, "MSWSock.lib")
 #pragma comment (lib, "lua54.lib")
 
-#define DATABASE
+//#define DATABASE
 #define WITH_VIEW
 #define WITH_SECTION
 

@@ -7,6 +7,7 @@
 #include "CDatabase.h"
 #include "COverlapEx.h"
 #include "OverlapPool.h"
+#include "Global.h"
 
 std::unique_ptr<CNetworkMgr> CNetworkMgr::m_instance;
 
@@ -107,7 +108,7 @@ bool CNetworkMgr::Release()
     return false;
 }
 
-void CNetworkMgr::WorkerFunc()
+void CNetworkMgr::IOCPFunc()
 {
 	while (true) {
 		DWORD num_bytes;
@@ -273,13 +274,21 @@ void CNetworkMgr::Recv(int id, int bytes, COverlapEx* over_ex)
 	int remain_data = bytes + client->GetSession()->GetRemainBuf();
 	char* packet = over_ex->m_send_buf;
 
+	bool needProcess = false;
 	while (remain_data > 0) {
 		BASE_PACKET* p = reinterpret_cast<BASE_PACKET*>(packet);
 
 		if (p->size <= remain_data) {
-			CPacketMgr::GetInstance()->PacketProcess(p, client);
+			std::unique_ptr<char[]> packetCopy = std::make_unique<char[]>(p->size);
+			memcpy(packetCopy.get(), p, p->size);
+
+			client->GetJobQueue().PushJob([client, p = std::move(packetCopy)]() {
+				CPacketMgr::GetInstance()->PacketProcess(reinterpret_cast<BASE_PACKET*>(p.get()), client);
+				});
+
 			packet += p->size;
 			remain_data -= p->size;
+			needProcess = true;
 		}
 		else break;
 	}
@@ -288,6 +297,9 @@ void CNetworkMgr::Recv(int id, int bytes, COverlapEx* over_ex)
 		memcpy(over_ex->m_send_buf, packet, remain_data);
 	}
 	client->GetSession()->RecvPacket();
+
+	if (needProcess)
+		GPacketJobQueue->AddSessionQueue(client);
 }
 
 void CNetworkMgr::Send(int id, int bytes, COverlapEx* over_ex)

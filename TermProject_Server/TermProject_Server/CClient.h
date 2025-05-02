@@ -2,6 +2,7 @@
 #include "CObject.h"
 #include "CSkill.h"
 #include "CSession.h"
+#include "JobQueue.h"
 
 class CItem;
 
@@ -37,6 +38,17 @@ public:
 	virtual unordered_set<int> CheckSection();
 	bool Damaged(int power, int attackID) override;
 
+	JobQueue& GetJobQueue() { return m_jobQueue; }
+	bool TryMarkInQueue()
+	{
+		bool expected = false;
+		return m_isEnqueued.compare_exchange_strong(expected, true);
+	}
+	void UnmarkInQueue() { m_isEnqueued.store(false); }
+	bool IsInQueue() const { return m_isEnqueued.load(); }
+	bool IsDisconnected() const { return m_isDisconnected; }
+	void SetDisconnected() { m_isDisconnected.store(true); }
+
 public:
 	mutex m_itemLock;
 
@@ -48,5 +60,9 @@ private:
 	CL_STATE m_State;	
 
 	CSession* m_session;
+
+	std::atomic_bool m_isDisconnected = false;
+	std::atomic_bool m_isEnqueued = false;
+	JobQueue m_jobQueue;
 };
 
