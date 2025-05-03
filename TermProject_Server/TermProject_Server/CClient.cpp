@@ -5,6 +5,7 @@
 #include "GameUtil.h"
 #include "CNetworkMgr.h"
 #include "Global.h"
+#include "CDatabase.h"
 
 CClient::CClient()
 {
@@ -421,6 +422,52 @@ bool CClient::Damaged(int power, int attackID)
 	}
 }
 
+void CClient::Logout()
+{
+	m_isDisconnected = true;
+
+	auto stat = static_cast<CClientStat*>(m_stat.get());
+
+	USER_INFO ui;
+	memcpy(ui.name, m_name, NAME_SIZE);
+	ui.pos_x = m_PosX;
+	ui.pos_y = m_PosY;
+	ui.cur_hp = stat->GetCurHp();
+	ui.max_hp = stat->GetMaxHp();
+	ui.exp = stat->GetExp();
+	ui.cur_mp = stat->GetMp();
+	ui.max_mp = stat->GetMaxMp();
+	ui.level = stat->GetLevel();
+	ui.item1 = GetItemType(0) - 1;
+	ui.item2 = GetItemType(1) - 1;
+	ui.item3 = GetItemType(2) - 1;
+	ui.item4 = GetItemType(3) - 1;
+	ui.item5 = GetItemType(4) - 1;
+	ui.item6 = GetItemType(5) - 1;
+	ui.moneycnt = 78;
+
+#ifdef DATABASE
+	CNetworkMgr::GetInstance()->GetDatabase()->SavePlayerInfo(ui);
+#endif
+
+	for (auto& p_id : m_viewList) {
+		if (m_ID >= MAX_USER)
+			continue;
+
+		auto pl = CNetworkMgr::GetInstance()->GetCObject(p_id);
+		{
+			lock_guard<mutex> ll(pl->m_StateLock);
+			if (CL_STATE::ST_INGAME != reinterpret_cast<CClient*>(pl)->GetState())
+				continue;
+		}
+
+		reinterpret_cast<CClient*>(pl)->RemoveObjectFromView(m_ID);
+	}
+	closesocket(m_session->GetSocket());
+
+	m_State = CL_STATE::ST_FREE;
+}
+
 void CClient::AddObjectToView(int c_id)
 {
 	m_viewList.insert(c_id);
@@ -453,14 +500,11 @@ void CClient::AddObjectToView(int c_id)
 
 void CClient::RemoveObjectFromView(int c_id)
 {
-	m_ViewLock.lock();
-	if (m_viewList.count(c_id))
-		m_viewList.erase(c_id);
-	else {
-		m_ViewLock.unlock();
+	const auto it = m_viewList.find(c_id);
+	if (it == m_viewList.end())
 		return;
-	}
-	m_ViewLock.unlock();
+
+	m_viewList.erase(c_id);
 
 	SC_REMOVE_OBJECT_PACKET p;
 	p.id = c_id;

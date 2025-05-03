@@ -48,6 +48,7 @@ public:
 	bool IsInQueue() const { return m_isEnqueued.load(); }
 	bool IsDisconnected() const { return m_isDisconnected; }
 	void SetDisconnected() { m_isDisconnected.store(true); }
+	void Logout();
 
 public:
 	mutex m_itemLock;

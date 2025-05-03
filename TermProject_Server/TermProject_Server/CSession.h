@@ -14,6 +14,7 @@ public:
 	int GetRemainBuf() const { return m_remainBufSize; }
 	const SOCKET& GetSocket() const { return m_socket; }
 	void SetRemainBuf(const int size) { m_remainBufSize = size; }
+	std::vector<char>& GetRecvPacketBuf() { return m_recvPacketBuf; }
 
 	void RecvPacket();
 	void SendPacket(void* packet);
@@ -30,5 +31,6 @@ private:
 	SOCKET m_socket;
 	int	m_remainBufSize;
 	COverlapEx m_recvOver;
+	std::vector<char> m_recvPacketBuf;
 };
 

@@ -149,7 +149,7 @@ void CNetworkMgr::TimerFunc()
 		if (true == m_timerQueue.try_pop(ev)) {
 			if (ev.wakeup_time > current_time) {
 				m_timerQueue.push(ev);
-				this_thread::yield();
+				this_thread::sleep_for(1s);
 				continue;
 			}
 			switch (ev.event_id) {
@@ -183,7 +183,7 @@ void CNetworkMgr::TimerFunc()
 			}
 			continue;
 		}
-		this_thread::yield();
+		this_thread::sleep_for(1s);
 	}
 }
 
@@ -275,15 +275,19 @@ void CNetworkMgr::Recv(int id, int bytes, COverlapEx* over_ex)
 	char* packet = over_ex->m_send_buf;
 
 	bool needProcess = false;
+	auto& recvBuf = client->GetSession()->GetRecvPacketBuf();
+
 	while (remain_data > 0) {
 		BASE_PACKET* p = reinterpret_cast<BASE_PACKET*>(packet);
 
 		if (p->size <= remain_data) {
-			std::unique_ptr<char[]> packetCopy = std::make_unique<char[]>(p->size);
-			memcpy(packetCopy.get(), p, p->size);
+			if (recvBuf.size() < p->size)
+				recvBuf.resize(p->size);
 
-			client->GetJobQueue().PushJob([client, p = std::move(packetCopy)]() {
-				CPacketMgr::GetInstance()->PacketProcess(reinterpret_cast<BASE_PACKET*>(p.get()), client);
+			memcpy(recvBuf.data(), p, p->size);
+
+			client->GetJobQueue().PushJob([client, p = std::move(recvBuf)]() {
+				CPacketMgr::GetInstance()->PacketProcess(reinterpret_cast<BASE_PACKET*>(const_cast<char*>(p.data())), client);
 				});
 
 			packet += p->size;
@@ -320,47 +324,7 @@ int CNetworkMgr::GetNewID()
 void CNetworkMgr::Disconnect(int id)
 {
 	CClient* pc = reinterpret_cast<CClient*>(m_objects[id]);
-	CClientStat* stat = reinterpret_cast<CClientStat*>(m_objects[id]->GetStat());
-	USER_INFO ui;
-	memcpy(ui.name, pc->GetName(), NAME_SIZE);
-	ui.pos_x = pc->GetPosX();
-	ui.pos_y = pc->GetPosY();
-	ui.cur_hp = stat->GetCurHp();
-	ui.max_hp = stat->GetMaxHp();
-	ui.exp = stat->GetExp();
-	ui.cur_mp = stat->GetMp();
-	ui.max_mp = stat->GetMaxMp();
-	ui.level = stat->GetLevel();
-	ui.item1 = pc->GetItemType(0) - 1;
-	ui.item2 = pc->GetItemType(1) - 1;
-	ui.item3 = pc->GetItemType(2) - 1;
-	ui.item4 = pc->GetItemType(3) - 1;
-	ui.item5 = pc->GetItemType(4) - 1;
-	ui.item6 = pc->GetItemType(5) - 1;
-	ui.moneycnt = 78;
-
-#ifdef DATABASE
-	m_database->SavePlayerInfo(ui);
-#endif
-
-	pc->m_ViewLock.lock_shared();
-	unordered_set <int> vl = pc->GetViewList();
-	pc->m_ViewLock.unlock_shared();
-	for (auto& p_id : vl) {
-		if (id >= MAX_USER)
-			continue;
-		auto& pl = m_objects[p_id];
-		{
-			lock_guard<mutex> ll(pl->m_StateLock);
-			if (CL_STATE::ST_INGAME != reinterpret_cast<CClient*>(pl)->GetState())
-				continue;
-		}
-		if (pl->GetID() == id)
-			continue;
-		reinterpret_cast<CClient*>(pl)->RemoveObjectFromView(id);
-	}
-	closesocket(pc->GetSession()->GetSocket());
-
-	lock_guard<mutex> ll(m_objects[id]->m_StateLock);
-	pc->SetState(CL_STATE::ST_FREE);
+	pc->GetJobQueue().PushJob([pc]() {
+		pc->Logout();
+		});
 }

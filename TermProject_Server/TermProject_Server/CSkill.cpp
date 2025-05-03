@@ -7,9 +7,7 @@ void CAttack::Use(int id)
 {
 	CClient* myClient = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(id));
 	
-	myClient->m_ViewLock.lock_shared();
 	auto viewList = myClient->GetViewList();
-	myClient->m_ViewLock.unlock_shared();
 
 	int posX = myClient->GetPosX();
 	int posY = myClient->GetPosY();
@@ -46,9 +44,7 @@ void CFire::Use(int id)
 {
 	CClient* myClient = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(id));
 
-	myClient->m_ViewLock.lock_shared();
 	auto viewList = myClient->GetViewList();
-	myClient->m_ViewLock.unlock_shared();
 
 	int posX = myClient->GetPosX();
 	int posY = myClient->GetPosY();
@@ -94,10 +90,8 @@ void CFire::Use(int id)
 void CExplosion::Use(int id)
 {
 	CClient* myClient = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(id));
-
-	myClient->m_ViewLock.lock_shared();
+	
 	auto viewList = myClient->GetViewList();
-	myClient->m_ViewLock.unlock_shared();
 
 	int posX = myClient->GetPosX();
 	int posY = myClient->GetPosY();
