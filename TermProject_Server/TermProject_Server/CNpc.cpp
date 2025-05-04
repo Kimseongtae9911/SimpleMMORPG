@@ -1,4 +1,4 @@
-#include "pch.h"
+ï»¿#include "pch.h"
 #include "CNpc.h"
 #include "GameUtil.h"
 #include "ChatUtil.h"
@@ -78,7 +78,9 @@ void CNpc::Chase()
 
 #ifdef WITH_VIEW
 #ifdef WITH_SECTION
-	ViewListUpdate(CheckSection());
+	std::unordered_set<int> viewList;
+	CheckSection(viewList);
+	ViewListUpdate(viewList);
 #else
 	m_ViewLock.lock_shared();
 	unordered_set<int> viewList = m_viewList;
@@ -94,12 +96,12 @@ void CNpc::Chase()
 			newView.insert(obj->GetID());
 	}
 	for (auto pl : newView) {
-		// new_vl¿¡´Â ÀÖ´Âµ¥ old_vl¿¡´Â ¾øÀ» ¶§ ÇÃ·¹ÀÌ¾îÀÇ ½Ã¾ß¿¡ µîÀå
+		// new_vlì—ëŠ” ìˆëŠ”ë° old_vlì—ëŠ” ì—†ì„ ë•Œ í”Œë ˆì´ì–´ì˜ ì‹œì•¼ì— ë“±ì¥
 		if (0 == viewList.count(pl)) {
 			reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->AddObjectToView(m_ID);
 		}
 		else {
-			// ÇÃ·¹ÀÌ¾î°¡ °è¼Ó º¸°í ÀÖÀ½.
+			// í”Œë ˆì´ì–´ê°€ ê³„ì† ë³´ê³  ìˆìŒ.
 			CClient* client = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl));
 			client->GetSession()->SendMovePacket(m_ID, x, y, client->lastMoveTime);
 		}
@@ -154,12 +156,13 @@ void CNpc::RandomMove()
 	int sectionX = static_cast<int>(x / SECTION_SIZE);
 	int sectionY = static_cast<int>(y / SECTION_SIZE);
 	if (m_sectionX != sectionX || m_sectionY != sectionY) {
-		GameUtil::RegisterToSection(m_sectionX, m_sectionY, sectionY, sectionX, m_ID);
+		GameUtil::RegisterToSection(m_sectionY, m_sectionX, sectionY, sectionX, m_ID);
 		m_sectionX = sectionX;
 		m_sectionY = sectionY;
 	}
 
-	unordered_set<int> viewList = CheckSection();
+	unordered_set<int> viewList;
+	CheckSection(viewList);
 	if (viewList.size() == 0) {
 		m_active = false;
 		return;
@@ -174,7 +177,7 @@ void CNpc::RandomMove()
 			break;
 		}
 		else {
-			// Peace ¸ó½ºÅÍ Ã³¸®
+			// Peace ëª¬ìŠ¤í„° ì²˜ë¦¬
 		}
 	}
 	
@@ -194,12 +197,12 @@ void CNpc::RandomMove()
 			newView.insert(obj->GetID());
 }
 	for (auto pl : newView) {
-		// new_vl¿¡´Â ÀÖ´Âµ¥ old_vl¿¡´Â ¾øÀ» ¶§ ÇÃ·¹ÀÌ¾îÀÇ ½Ã¾ß¿¡ µîÀå
+		// new_vlì—ëŠ” ìˆëŠ”ë° old_vlì—ëŠ” ì—†ì„ ë•Œ í”Œë ˆì´ì–´ì˜ ì‹œì•¼ì— ë“±ì¥
 		if (0 == viewList.count(pl)) {
 			reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->AddObjectToView(m_ID);
 		}
 		else {
-			// ÇÃ·¹ÀÌ¾î°¡ °è¼Ó º¸°í ÀÖÀ½.
+			// í”Œë ˆì´ì–´ê°€ ê³„ì† ë³´ê³  ìˆìŒ.
 			CClient* client = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl));
 			client->GetSession()->SendMovePacket(m_ID, x, y, client->lastMoveTime);
 			if (MONSTER_TYPE::AGRO == m_monType && Agro(pl)) {
@@ -266,94 +269,54 @@ void CNpc::WakeUp(int waker)
 	CNetworkMgr::GetInstance()->RegisterEvent(ev);
 }
 
-unordered_set<int> CNpc::CheckSection()
+void CNpc::CheckSection(std::unordered_set<int>& viewList)
 {
-	unordered_set<int> viewList;
+	viewList.reserve(10);
+
+	auto InsertToViewList = [this, &viewList](int sectionX, int sectionY) {
+		for (int id : GameUtil::GetSectionObjects(sectionY, sectionX)) {
+			if (id >= MAX_USER || id == m_ID)
+				continue;
+			if (CanSee(id))
+				viewList.insert(id);
+		}
+		};
+
 	//Center
-	for (int id : GameUtil::GetSectionObjects(m_sectionY, m_sectionX)) {
-		if (id >= MAX_USER || id == m_ID)
-			continue;
-		if (true == CanSee(id))
-			viewList.insert(id);
-	}
+	InsertToViewList(m_sectionX, m_sectionY);
 
 	//Right
 	if (m_PosX % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionX != SECTION_NUM - 1) {
-		for (int id : GameUtil::GetSectionObjects(m_sectionY, m_sectionX + 1)) {
-			if (id >= MAX_USER || id == m_ID)
-				continue;
-			if (true == CanSee(id))
-				viewList.insert(id);
-		}
+		InsertToViewList(m_sectionX + 1, m_sectionY);
 
 		//RightDown
-		if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1) {
-			for (int id : GameUtil::GetSectionObjects(m_sectionY + 1, m_sectionX + 1)) {
-				if (id >= MAX_USER || id == m_ID)
-					continue;
-				if (true == CanSee(id))
-					viewList.insert(id);
-			}
-		}
+		if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1)
+			InsertToViewList(m_sectionX + 1, m_sectionY + 1);
+		
 		//RightUp
-		else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0) {
-			for (int id : GameUtil::GetSectionObjects(m_sectionY - 1, m_sectionX + 1)) {
-				if (id >= MAX_USER || id == m_ID)
-					continue;
-				if (true == CanSee(id))
-					viewList.insert(id);
-			}
-		}
-
+		else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0)
+			InsertToViewList(m_sectionX + 1, m_sectionY - 1);
 	}
 	//Left
 	else if (m_PosX % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionX != 0) {
-		for (int id : GameUtil::GetSectionObjects(m_sectionY, m_sectionX - 1)) {
-			if (id >= MAX_USER || id == m_ID)
-				continue;
-			if (true == CanSee(id))
-				viewList.insert(id);
-		}
+		InsertToViewList(m_sectionX - 1, m_sectionY);
+
 		//LeftDown
-		if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1) {
-			for (int id : GameUtil::GetSectionObjects(m_sectionY + 1, m_sectionX - 1)) {
-				if (id >= MAX_USER || id == m_ID)
-					continue;
-				if (true == CanSee(id))
-					viewList.insert(id);
-			}
-		}
+		if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1)
+			InsertToViewList(m_sectionX - 1, m_sectionY + 1);
+
 		//LeftUp
-		else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0) {
-			for (int id : GameUtil::GetSectionObjects(m_sectionY - 1, m_sectionX - 1)) {
-				if (id >= MAX_USER || id == m_ID)
-					continue;
-				if (true == CanSee(id))
-					viewList.insert(id);
-			}
-		}
+		else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0)
+			InsertToViewList(m_sectionX - 1, m_sectionY - 1);
 	}
 
 	//Down
-	if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1) {
-		for (int id : GameUtil::GetSectionObjects(m_sectionY + 1, m_sectionX)) {
-			if (id >= MAX_USER || id == m_ID)
-				continue;
-			if (true == CanSee(id))
-				viewList.insert(id);
-		}
-	}
+	if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1)
+		InsertToViewList(m_sectionX, m_sectionY + 1);
+	
 	//Up
-	else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0) {
-		for (int id : GameUtil::GetSectionObjects(m_sectionY - 1, m_sectionX)) {
-			if (id >= MAX_USER || id == m_ID)
-				continue;
-			if (true == CanSee(id))
-				viewList.insert(id);
-		}
-	}
-
-	return viewList;
+	else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0)
+		InsertToViewList(m_sectionX, m_sectionY - 1);
 }
 
 bool CNpc::Damaged(int power, int attackID)
@@ -409,7 +372,9 @@ void CNpc::Update()
 		RandomMove();
 	}
 	
-	
+	if (!m_active)
+		return;
+
 	CNetworkMgr::GetInstance()->RegisterEvent({ m_ID, chrono::system_clock::now() + 1s, EV_RANDOM_MOVE, 0 });
 }
 

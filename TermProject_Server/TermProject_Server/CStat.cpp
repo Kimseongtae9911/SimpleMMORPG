@@ -1,14 +1,5 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "CStat.h"
-
-void CStat::HealHp(int heal)
-{
-	m_hpLock.lock();
-	m_curHp += heal;
-	if (m_curHp > m_maxHp)
-		m_curHp = m_maxHp;
-	m_hpLock.unlock();
-}
 
 bool CStat::Damaged(int power)
 {
@@ -45,6 +36,13 @@ void CClientStat::GainExp(int exp)
 	}
 }
 
+void CClientStat::HealHp(int heal)
+{
+	m_curHp += heal;
+	if (m_curHp > m_maxHp)
+		m_curHp = m_maxHp;
+}
+
 void CClientStat::HealMp(int heal)
 {
 	m_curMp += heal;
@@ -54,15 +52,12 @@ void CClientStat::HealMp(int heal)
 
 bool CClientStat::Damaged(int power)
 {
-	m_hpLock.lock();
 	m_curHp -= power;
 	if (m_curHp <= 0) {
 		m_curHp = m_maxHp / 2;
-		m_hpLock.unlock();
 		return true;
 	}
 	else {
-		m_hpLock.unlock();
 		return false;
 	}
 }

@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "GameUtil.h"
 
 char GameUtil::tilemap[W_HEIGHT][W_WIDTH];
@@ -46,23 +46,23 @@ bool GameUtil::CanMove(short x, short y)
 	return true;
 }
 
-unordered_set<int> GameUtil::GetSectionObjects(int x, int y)
+unordered_set<int> GameUtil::GetSectionObjects(int y, int x)
 {
-	sections[x][y].sectionLock.lock_shared();
-	unordered_set<int> objects(sections[x][y].objects);
-	sections[x][y].sectionLock.unlock_shared();
+	sections[y][x].sectionLock.lock_shared();
+	unordered_set<int> objects(sections[y][x].objects);
+	sections[y][x].sectionLock.unlock_shared();
 
 	return objects;
 }
 
-void GameUtil::RegisterToSection(int beforeX, int berforeY, int x, int y, int id)
+void GameUtil::RegisterToSection(int beforeY, int beforeX, int y, int x, int id)
 {
 	if (beforeX != -1) {
-		sections[x][y].sectionLock.lock();
-		sections[x][y].objects.erase(id);
-		sections[x][y].sectionLock.unlock();
+		sections[beforeY][beforeX].sectionLock.lock();
+		sections[beforeY][beforeX].objects.erase(id);
+		sections[beforeY][beforeX].sectionLock.unlock();
 	}
-	sections[x][y].sectionLock.lock(); 
-	sections[x][y].objects.insert(id); 
-	sections[x][y].sectionLock.unlock();
+	sections[y][x].sectionLock.lock(); 
+	sections[y][x].objects.insert(id); 
+	sections[y][x].sectionLock.unlock();
 }

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "CObject.h"
 #include "CSkill.h"
 #include "CSession.h"
@@ -35,7 +35,7 @@ public:
 	void AddObjectToView(int c_id);
 	void RemoveObjectFromView(int c_id);
 
-	virtual unordered_set<int> CheckSection();
+	void CheckSection(std::unordered_set<int>& viewList) override;
 	bool Damaged(int power, int attackID) override;
 
 	JobQueue& GetJobQueue() { return m_jobQueue; }
@@ -58,7 +58,8 @@ private:
 	array<CSkill*, 4> m_skills;	
 	array<CItem*, 6> m_items;
 
-	CL_STATE m_State;	
+	CL_STATE m_State;
+	bool m_isHealEventRegistered = false;
 
 	CSession* m_session;
 

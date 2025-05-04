@@ -1,4 +1,4 @@
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
+ï»¿#define _WINSOCK_DEPRECATED_NO_WARNINGS
 
 #include <WinSock2.h>
 #include <winsock.h>
@@ -19,7 +19,7 @@ using namespace chrono;
 
 extern HWND		hWnd;
 
-const static int MAX_TEST = 10000;
+const static int MAX_TEST = 2000;
 const static int MAX_CLIENTS = MAX_TEST * 2;
 const static int INVALID_ID = -1;
 const static int MAX_PACKET_SIZE = 255;
@@ -63,14 +63,14 @@ atomic_int num_connections;
 atomic_int client_to_close;
 atomic_int active_clients;
 
-int			global_delay;				// ms´ÜÀ§, 1000ÀÌ ³ÑÀ¸¸é Å¬¶óÀÌ¾ğÆ® Áõ°¡ Á¾·á
+int			global_delay;				// msë‹¨ìœ„, 1000ì´ ë„˜ìœ¼ë©´ í´ë¼ì´ì–¸íŠ¸ ì¦ê°€ ì¢…ë£Œ
 
 vector <thread*> worker_threads;
 thread test_thread;
 
 float point_cloud[MAX_TEST * 2];
 
-// ³ªÁß¿¡ NPC±îÁö Ãß°¡ È®Àå ¿ë
+// ë‚˜ì¤‘ì— NPCê¹Œì§€ ì¶”ê°€ í™•ì¥ ìš©
 struct ALIEN {
 	int id;
 	int x, y;
@@ -87,7 +87,7 @@ void error_display(const char* msg, int err_no)
 		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
 		(LPTSTR)&lpMsgBuf, 0, NULL);
 	std::cout << msg;
-	std::wcout << L"¿¡·¯" << lpMsgBuf << std::endl;
+	std::wcout << L"ì—ëŸ¬" << lpMsgBuf << std::endl;
 
 	MessageBox(hWnd, lpMsgBuf, L"ERROR", 0);
 	LocalFree(lpMsgBuf);
@@ -204,7 +204,7 @@ void Worker_Thread()
 			while (io_size > 0) {
 				if (0 == psize) psize = buf[0];
 				if (io_size + pr_size >= psize) {
-					// Áö±İ ÆĞÅ¶ ¿Ï¼º °¡´É
+					// ì§€ê¸ˆ íŒ¨í‚· ì™„ì„± ê°€ëŠ¥
 					unsigned char packet[MAX_PACKET_SIZE];
 					memcpy(packet, g_clients[ci].packet_buf, pr_size);
 					memcpy(packet + pr_size, buf, psize - pr_size);

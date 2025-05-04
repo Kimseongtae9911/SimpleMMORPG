@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "CObject.h"
 
 class CNpc : public CObject
@@ -26,7 +26,7 @@ public:
 	bool Agro(int to);
 	void WakeUp(int waker);
 
-	virtual unordered_set<int> CheckSection();
+	void CheckSection(std::unordered_set<int>& viewList) override;
 
 	bool Damaged(int power, int attackID) override;
 	void Update() override;

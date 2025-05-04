@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "CNetworkMgr.h"
 #include "CPacketMgr.h"
 #include "GameUtil.h"
@@ -252,7 +252,10 @@ void CNetworkMgr::MonsterRespawn(int id, int bytes, COverlapEx* over_ex)
 
 void CNetworkMgr::PlayerHeal(int id, int bytes, COverlapEx* over_ex)
 {
-	reinterpret_cast<CClient*>(m_objects[id])->Heal();
+	CClient* client = static_cast<CClient*>(m_objects[id]);
+	client->GetJobQueue().PushJob([client]() {
+		client->Heal();
+		});
 }
 
 void CNetworkMgr::NpcMove(int id, int bytes, COverlapEx* over_ex)

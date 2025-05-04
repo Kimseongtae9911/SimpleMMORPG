@@ -1,4 +1,4 @@
-#include "pch.h"
+ï»¿#include "pch.h"
 #include "CClient.h"
 #include "CNpc.h"
 #include "CItem.h"
@@ -130,6 +130,12 @@ void CClient::UseSkill(int skill)
 		m_skills[skill]->Use(m_ID);
 		stat->SetMp(stat->GetCurMp() - m_skills[skill]->GetMpConsumtion());
 	}
+
+	if (!m_isHealEventRegistered && !stat->IsMaxMp())
+	{
+		TIMER_EVENT ev{ m_ID, chrono::system_clock::now() + 5s, EV_PLAYER_HEAL, 0 };
+		CNetworkMgr::GetInstance()->RegisterEvent(ev);
+	}
 }
 
 void CClient::UseItem(int inven)
@@ -138,7 +144,7 @@ void CClient::UseItem(int inven)
 		bool use = false;
 		switch (m_items[inven]->GetItemType()) {
 		case ITEM_TYPE::HP_POTION:
-			m_stat->HealHp(50);
+			static_cast<CClientStat*>(m_stat.get())->HealHp(50);
 			use = true;
 			m_session->SendChatPacket(m_ID, "Used HP Potion");
 			break;
@@ -176,15 +182,20 @@ void CClient::SetItem(int index, ITEM_TYPE type, int num, bool enable)
 
 void CClient::Heal()
 {
-	CClientStat* stat = reinterpret_cast<CClientStat*>(m_stat.get());
+	CClientStat* stat = static_cast<CClientStat*>(m_stat.get());
 
-	m_stat->HealHp(static_cast<int>(m_stat->GetMaxHp() * 0.1f));
+	stat->HealHp(static_cast<int>(m_stat->GetMaxHp() * 0.1f));
 	stat->HealMp(static_cast<int>(stat->GetMaxMp() * 0.1f));
 
-	m_session->SendStatChangePacket(reinterpret_cast<CClientStat*>(m_stat.get()));
-		
-	TIMER_EVENT ev{ m_ID, chrono::system_clock::now() + 5s, EV_PLAYER_HEAL, 0 };
-	CNetworkMgr::GetInstance()->RegisterEvent(ev);
+	m_session->SendStatChangePacket(static_cast<CClientStat*>(m_stat.get()));
+	
+	if (!stat->IsFullCondition())
+	{
+		TIMER_EVENT ev{ m_ID, chrono::system_clock::now() + 5s, EV_PLAYER_HEAL, 0 };
+		CNetworkMgr::GetInstance()->RegisterEvent(ev);
+	}
+	else
+		m_isHealEventRegistered = false;
 }
 
 void CClient::Move(char dir)
@@ -217,13 +228,14 @@ void CClient::Move(char dir)
 	int sectionY = static_cast<int>(y / SECTION_SIZE);
 
 	if (m_sectionX != sectionX || m_sectionY != sectionY) {
-		GameUtil::RegisterToSection(m_sectionX, m_sectionY, sectionY, sectionX, m_ID);
+		GameUtil::RegisterToSection(m_sectionY, m_sectionX, sectionY, sectionX, m_ID);
 		m_sectionX = sectionX;
 		m_sectionY = sectionY;
 	}
 
 	unordered_set<int> oldView = m_viewList;
-	unordered_set<int> newView = CheckSection();
+	std::unordered_set<int> newView;
+	CheckSection(newView);
 
 	m_session->SendMovePacket(m_ID, x, y, lastMoveTime);
 
@@ -233,7 +245,7 @@ void CClient::Move(char dir)
 			CClient* cl = reinterpret_cast<CClient*>(cpl);
 
 			cl->GetJobQueue().PushJob([this, cl, x, y]() {
-				// ½Ã¾ß¿¡ ÀÖ´Ù¸é ÆÐÅ¶ Àü¼Û, ¾ø´Ù¸é ½Ã¾ß¿¡ Ãß°¡
+				// ì‹œì•¼ì— ìžˆë‹¤ë©´ íŒ¨í‚· ì „ì†¡, ì—†ë‹¤ë©´ ì‹œì•¼ì— ì¶”ê°€
 				const auto& viewList = cl->GetViewList();
 				viewList.end() != viewList.find(m_ID) ? cl->GetSession()->SendMovePacket(m_ID, x, y, lastMoveTime) : cl->AddObjectToView(m_ID);
 				});
@@ -318,106 +330,78 @@ void CClient::Move(char dir)
 #endif
 }
 
-unordered_set<int> CClient::CheckSection()
+void CClient::CheckSection(std::unordered_set<int>& viewList)
 {
-	unordered_set<int> viewList;
+	viewList.reserve(10);
+	const auto InsertToViewList = [this, &viewList](int sectionX, int sectionY) {
+		for (int id : GameUtil::GetSectionObjects(m_sectionY, m_sectionX)) {
+			if (id == m_ID)
+				continue;
+
+			if (CanSee(id))
+				viewList.insert(id);
+		}
+		};
 	//Center
-	for (int id : GameUtil::GetSectionObjects(m_sectionY, m_sectionX)) {
-		if (id == m_ID)
-			continue;
-		if (true == CanSee(id))
-			viewList.insert(id);
-	}
+	InsertToViewList(m_sectionX, m_sectionY);
 
 	//Right
 	if (m_PosX % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionX != SECTION_NUM - 1) {
-		for (int id : GameUtil::GetSectionObjects(m_sectionY, m_sectionX + 1)) {
-			if (id == m_ID)
-				continue;
-			if (true == CanSee(id))
-				viewList.insert(id);
-		}
+		InsertToViewList(m_sectionX + 1, m_sectionY);
 
 		//RightDown
-		if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1) {
-			for (int id : GameUtil::GetSectionObjects(m_sectionY + 1, m_sectionX + 1)) {
-				if (id == m_ID)
-					continue;
-				if (true == CanSee(id))
-					viewList.insert(id);
-			}
-		}
+		if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1)
+			InsertToViewList(m_sectionX + 1, m_sectionY + 1);
+
 		//RightUp
-		else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0) {
-			for (int id : GameUtil::GetSectionObjects(m_sectionY - 1, m_sectionX + 1)) {
-				if (id == m_ID)
-					continue;
-				if (true == CanSee(id))
-					viewList.insert(id);
-			}
-		}
+		else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0)
+			InsertToViewList(m_sectionX + 1, m_sectionY - 1);	
 
 	}
 	//Left
 	else if (m_PosX % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionX != 0) {
-		for (int id : GameUtil::GetSectionObjects(m_sectionY, m_sectionX - 1)) {
-			if (id == m_ID)
-				continue;
-			if (true == CanSee(id))
-				viewList.insert(id);
-		}
+		InsertToViewList(m_sectionX - 1, m_sectionY);
+
 		//LeftDown
-		if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1) {
-			for (int id : GameUtil::GetSectionObjects(m_sectionY + 1, m_sectionX - 1)) {
-				if (id == m_ID)
-					continue;
-				if (true == CanSee(id))
-					viewList.insert(id);
-			}
-		}
+		if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1)
+			InsertToViewList(m_sectionX - 1, m_sectionY + 1);
+
 		//LeftUp
-		else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0) {
-			for (int id : GameUtil::GetSectionObjects(m_sectionY - 1, m_sectionX - 1)) {
-				if (id == m_ID)
-					continue;
-				if (true == CanSee(id))
-					viewList.insert(id);
-			}
-		}
+		else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0)
+			InsertToViewList(m_sectionX - 1, m_sectionY - 1);
 	}
 
 	//Down
-	if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1) {
-		for (int id : GameUtil::GetSectionObjects(m_sectionY + 1, m_sectionX)) {
-			if (id == m_ID)
-				continue;
-			if (true == CanSee(id))
-				viewList.insert(id);
-		}
-	}
+	if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1)
+		InsertToViewList(m_sectionX, m_sectionY + 1);
+	
 	//Up
-	else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0) {
-		for (int id : GameUtil::GetSectionObjects(m_sectionY - 1, m_sectionX)) {
-			if (id == m_ID)
-				continue;
-			if (true == CanSee(id))
-				viewList.insert(id);
-		}
-	}
-
-	return viewList;
+	else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0)
+		InsertToViewList(m_sectionX, m_sectionY - 1);
 }
 
 bool CClient::Damaged(int power, int attackID)
 {
+	const auto RegisterHealEvent = [this]() {
+		auto stat = static_cast<CClientStat*>(m_stat.get());
+		if (!m_isHealEventRegistered && !stat->IsMaxHp())
+		{
+			TIMER_EVENT ev{ m_ID, chrono::system_clock::now() + 5s, EV_PLAYER_HEAL, 0 };
+			CNetworkMgr::GetInstance()->RegisterEvent(ev);
+		}
+		};
+
 	if (m_stat->Damaged(power)) {	
 		SetPos(48, 47);
 		m_session->SendMovePacket(m_ID, 48, 47, lastMoveTime);
 		m_session->SendStatChangePacket(reinterpret_cast<CClientStat*>(m_stat.get()));
+
+		RegisterHealEvent();
 		return true;
 	}
 	else {
 		m_session->SendStatChangePacket(reinterpret_cast<CClientStat*>(m_stat.get()));
+		RegisterHealEvent();
 		return false;
 	}
 }
@@ -454,14 +438,11 @@ void CClient::Logout()
 		if (m_ID >= MAX_USER)
 			continue;
 
-		auto pl = CNetworkMgr::GetInstance()->GetCObject(p_id);
-		{
-			lock_guard<mutex> ll(pl->m_StateLock);
-			if (CL_STATE::ST_INGAME != reinterpret_cast<CClient*>(pl)->GetState())
-				continue;
-		}
-
-		reinterpret_cast<CClient*>(pl)->RemoveObjectFromView(m_ID);
+		auto pl = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(p_id));
+		pl->GetJobQueue().PushJob([this, pl]() {
+			pl->RemoveObjectFromView(m_ID);
+			});
+		GPacketJobQueue->AddSessionQueue(pl);
 	}
 	closesocket(m_session->GetSocket());
 

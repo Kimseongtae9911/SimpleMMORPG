@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "CDatabase.h"
 
 CDatabase::CDatabase()
@@ -54,7 +54,7 @@ bool CDatabase::Initialize()
 	return true;
 }
 
-char* CDatabase::GetPlayerInfo(string name)
+void CDatabase::GetPlayerInfo(string name, USER_INFO& userInfo)
 {
     // player_name, pos_x, pos_y, player_level, player_exp, player_maxhp, player_hp
     SQLINTEGER user_level = -1, user_exp = -1, user_maxhp = -1, user_hp = -1, user_maxmp = -1, user_mp = -1, moneycnt = -1;
@@ -65,8 +65,6 @@ char* CDatabase::GetPlayerInfo(string name)
     string temp = "EXEC get_user_data " + name;
     wstring sql;
     sql.assign(temp.cbegin(), temp.cend());
-
-    USER_INFO* user_info = new USER_INFO;
 
     SQLRETURN retcode = SQLExecDirect(m_hstmt, (SQLWCHAR*)sql.c_str(), SQL_NTS);
     if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
@@ -96,40 +94,40 @@ char* CDatabase::GetPlayerInfo(string name)
         {
             wprintf(L"%s %3d %3d %3d %3d %3d %3d %3d %3d\n", user_name, user_pos_x, user_pos_y, user_level, user_exp, user_maxhp, user_hp, user_maxmp, user_mp);
            
-            strcpy_s(user_info->name, (char*)user_name);
-            user_info->pos_x = user_pos_x;
-            user_info->pos_y = user_pos_y;
-            user_info->level = user_level;
-            user_info->exp = user_exp;
-            user_info->max_hp = user_maxhp;
-            user_info->cur_hp = user_hp;
-            user_info->max_mp = user_maxmp;
-            user_info->cur_mp = user_mp;
-            user_info->item1 = item1;
-            user_info->item2 = item2;
-            user_info->item3 = item3;
-            user_info->item4 = item4;
-            user_info->item5 = item5;
-            user_info->item6 = item6;
-            user_info->moneycnt = moneycnt;
+            strcpy_s(userInfo.name, (char*)user_name);
+            userInfo.pos_x = user_pos_x;
+            userInfo.pos_y = user_pos_y;
+            userInfo.level = user_level;
+            userInfo.exp = user_exp;
+            userInfo.max_hp = user_maxhp;
+            userInfo.cur_hp = user_hp;
+            userInfo.max_mp = user_maxmp;
+            userInfo.cur_mp = user_mp;
+            userInfo.item1 = item1;
+            userInfo.item2 = item2;
+            userInfo.item3 = item3;
+            userInfo.item4 = item4;
+            userInfo.item5 = item5;
+            userInfo.item6 = item6;
+            userInfo.moneycnt = moneycnt;
         }
         else {
             if (user_name[0] == '\0') {
-                user_info->pos_x = -1;
-                user_info->pos_y = -1;
-                user_info->level = -1;
-                user_info->exp = -1;
-                user_info->max_hp = -1;
-                user_info->cur_hp = -1;
-                user_info->max_mp = -1;
-                user_info->cur_mp = -1;
-                user_info->item1 = -1;
-                user_info->item2 = -1;
-                user_info->item3 = -1;
-                user_info->item4 = -1;
-                user_info->item5 = -1;
-                user_info->item6 = -1;
-                user_info->moneycnt = -1;
+                userInfo.pos_x = -1;
+                userInfo.pos_y = -1;
+                userInfo.level = -1;
+                userInfo.exp = -1;
+                userInfo.max_hp = -1;
+                userInfo.cur_hp = -1;
+                userInfo.max_mp = -1;
+                userInfo.cur_mp = -1;
+                userInfo.item1 = -1;
+                userInfo.item2 = -1;
+                userInfo.item3 = -1;
+                userInfo.item4 = -1;
+                userInfo.item5 = -1;
+                userInfo.item6 = -1;
+                userInfo.moneycnt = -1;
                 SQLCloseCursor(m_hstmt);
                 SQLFreeStmt(m_hstmt, SQL_UNBIND);
             }
@@ -145,7 +143,6 @@ char* CDatabase::GetPlayerInfo(string name)
     }
     SQLCloseCursor(m_hstmt);
     SQLFreeStmt(m_hstmt, SQL_UNBIND);
-    return reinterpret_cast<char*>(user_info);
 }
 
 void CDatabase::SavePlayerInfo(USER_INFO& ui)

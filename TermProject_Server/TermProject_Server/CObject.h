@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "CStat.h"
 
 class CObject
@@ -24,7 +24,7 @@ public:
 
 	bool CanSee(int to) const;
 	
-	virtual unordered_set<int> CheckSection() { return {}; }
+	virtual void CheckSection(std::unordered_set<int>& viewList) { }
 	virtual bool Damaged(int power, int attackID) = 0;
 	virtual void Update() {}
 

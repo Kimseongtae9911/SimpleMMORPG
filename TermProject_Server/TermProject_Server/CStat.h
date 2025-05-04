@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 class CStat
 {
 public:
@@ -12,7 +12,6 @@ public:
 	int GetCurHp() const { return m_curHp; }
 	int GetPower() const { return m_power; }
 
-	void HealHp(int heal);
 	virtual bool Damaged(int power);
 
 protected:
@@ -41,8 +40,13 @@ public:
 	void SetMp(const int mp) { if (mp > m_maxMp) { m_curMp = m_maxMp; } else { m_curMp = mp; } }
 
 	void GainExp(int exp);
+	void HealHp(int heal);
 	void HealMp(int heal);
 	bool Damaged(int power) override;
+
+	bool IsFullCondition() const { return (m_curHp == m_maxHp) && (m_curMp == m_maxMp); }
+	bool IsMaxMp() const { return m_curMp == m_maxMp; }
+	bool IsMaxHp() const { return m_curHp == m_maxHp; }
 
 private:
 	int m_maxExp;

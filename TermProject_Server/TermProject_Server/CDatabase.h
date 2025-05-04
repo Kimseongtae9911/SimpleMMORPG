@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <sqlext.h>
 
 class CDatabase
@@ -9,7 +9,7 @@ public:
 
 	bool Initialize();
 
-	char* GetPlayerInfo(string name);
+	void GetPlayerInfo(string name, USER_INFO& userInfo);
 	void SavePlayerInfo(USER_INFO& ui);
 	void MakeNewInfo(char* name);
 

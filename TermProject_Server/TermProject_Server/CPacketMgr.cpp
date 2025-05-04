@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "CPacketMgr.h"
 #include "CNetworkMgr.h"
 #include "CDatabase.h"
@@ -48,11 +48,12 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CClient* client)
 
 	if (strcmp(p->name, "Stress_Test")) {
 #ifdef DATABASE
-		USER_INFO* user_info = reinterpret_cast<USER_INFO*>(CNetworkMgr::GetInstance()->GetDatabase()->GetPlayerInfo(p->name));
+		USER_INFO user_info;
+		CNetworkMgr::GetInstance()->GetDatabase()->GetPlayerInfo(p->name, user_info);
 #else
-		USER_INFO* user_info = new USER_INFO{ 100, 100, 50, 50, 1, 0, 30, 30, "KST", -1, -1, -1, -1, -1, -1, 0 };
+		USER_INFO user_info = USER_INFO{ 100, 100, 50, 50, 1, 0, 30, 30, "KST", -1, -1, -1, -1, -1, -1, 0 };
 #endif
-		if (user_info->max_hp == -1) {
+		if (user_info.max_hp == -1) {
 			CNetworkMgr::GetInstance()->GetDatabase()->MakeNewInfo(p->name);
 		}
 		else {
@@ -63,20 +64,20 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CClient* client)
 			else {
 				client->SetName(p->name);
 				CClientStat* stat = reinterpret_cast<CClientStat*>(client->GetStat()); 
-				stat->SetExp(user_info->exp);
+				stat->SetExp(user_info.exp);
 				{
 					lock_guard<mutex> ll{ client->m_StateLock };
-					client->SetPos(user_info->pos_x, user_info->pos_y);
-					stat->SetLevel(user_info->level);
-					stat->SetMaxHp(user_info->max_hp);
-					stat->SetCurHp(user_info->cur_hp);
-					stat->SetMaxExp(INIT_EXP + (user_info->level - 1) * EXP_UP);
-					stat->SetMaxMp(user_info->max_mp);
-					stat->SetMp(user_info->cur_mp);
+					client->SetPos(user_info.pos_x, user_info.pos_y);
+					stat->SetLevel(user_info.level);
+					stat->SetMaxHp(user_info.max_hp);
+					stat->SetCurHp(user_info.cur_hp);
+					stat->SetMaxExp(INIT_EXP + (user_info.level - 1) * EXP_UP);
+					stat->SetMaxMp(user_info.max_mp);
+					stat->SetMp(user_info.cur_mp);
 					client->SetState(CL_STATE::ST_INGAME);
 				}
 
-				client->GetSession()->SendLoginInfoPacket(client->GetID(), user_info->pos_x, user_info->pos_y, p->name, stat);
+				client->GetSession()->SendLoginInfoPacket(client->GetID(), user_info.pos_x, user_info.pos_y, p->name, stat);
 				for (auto& pl : CNetworkMgr::GetInstance()->GetAllObject()) {
 					if (pl->GetID() == client->GetID() || pl->GetID() == -1)
 						continue;
@@ -95,68 +96,68 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CClient* client)
 						reinterpret_cast<CNpc*>(pl)->WakeUp(client->GetID());
 					client->AddObjectToView(pl->GetID());
 				}
-				if (user_info->item1 != -1) {
-					client->SetItem(0, static_cast<ITEM_TYPE>(user_info->item1 + 1), user_info->moneycnt, true);
+				if (user_info.item1 != -1) {
+					client->SetItem(0, static_cast<ITEM_TYPE>(user_info.item1 + 1), user_info.moneycnt, true);
 					SC_ITEM_GET_PACKET p;
 					p.size = sizeof(p);
 					p.type = SC_ITEM_GET;
 					p.inven_num = 0;
-					p.item_type = static_cast<ITEM_TYPE>(user_info->item1 + 1);
+					p.item_type = static_cast<ITEM_TYPE>(user_info.item1 + 1);
 					p.x = client->GetPosX();
 					p.y = client->GetPosY();
 					client->GetSession()->SendPacket(&p);
 				}
-				if (user_info->item2 != -1) {
-					client->SetItem(1, static_cast<ITEM_TYPE>(user_info->item2 + 1), 0, true);
+				if (user_info.item2 != -1) {
+					client->SetItem(1, static_cast<ITEM_TYPE>(user_info.item2 + 1), 0, true);
 					SC_ITEM_GET_PACKET p;
 					p.size = sizeof(p);
 					p.type = SC_ITEM_GET;
 					p.inven_num = 1;
-					p.item_type = static_cast<ITEM_TYPE>(user_info->item2 + 1);
+					p.item_type = static_cast<ITEM_TYPE>(user_info.item2 + 1);
 					p.x = client->GetPosX();
 					p.y = client->GetPosY();
 					client->GetSession()->SendPacket(&p);
 				}
-				if (user_info->item3 != -1) {
-					client->SetItem(2, static_cast<ITEM_TYPE>(user_info->item3 + 1), 0, true);
+				if (user_info.item3 != -1) {
+					client->SetItem(2, static_cast<ITEM_TYPE>(user_info.item3 + 1), 0, true);
 					SC_ITEM_GET_PACKET p;
 					p.size = sizeof(p);
 					p.type = SC_ITEM_GET;
 					p.inven_num = 2;
-					p.item_type = static_cast<ITEM_TYPE>(user_info->item3 + 1);
+					p.item_type = static_cast<ITEM_TYPE>(user_info.item3 + 1);
 					p.x = client->GetPosX();
 					p.y = client->GetPosY();
 					client->GetSession()->SendPacket(&p);
 				}
-				if (user_info->item4 != -1) {
-					client->SetItem(3, static_cast<ITEM_TYPE>(user_info->item4 + 1), 0, true);
+				if (user_info.item4 != -1) {
+					client->SetItem(3, static_cast<ITEM_TYPE>(user_info.item4 + 1), 0, true);
 					SC_ITEM_GET_PACKET p;
 					p.size = sizeof(p);
 					p.type = SC_ITEM_GET;
 					p.inven_num = 3;
-					p.item_type = static_cast<ITEM_TYPE>(user_info->item4 + 1);
+					p.item_type = static_cast<ITEM_TYPE>(user_info.item4 + 1);
 					p.x = client->GetPosX();
 					p.y = client->GetPosY();
 					client->GetSession()->SendPacket(&p);
 				}
-				if (user_info->item5 != -1) {
-					client->SetItem(4, static_cast<ITEM_TYPE>(user_info->item5 + 1), 0, true);
+				if (user_info.item5 != -1) {
+					client->SetItem(4, static_cast<ITEM_TYPE>(user_info.item5 + 1), 0, true);
 					SC_ITEM_GET_PACKET p;
 					p.size = sizeof(p);
 					p.type = SC_ITEM_GET;
 					p.inven_num = 4;
-					p.item_type = static_cast<ITEM_TYPE>(user_info->item5 + 1);
+					p.item_type = static_cast<ITEM_TYPE>(user_info.item5 + 1);
 					p.x = client->GetPosX();
 					p.y = client->GetPosY();
 					client->GetSession()->SendPacket(&p);
 				}
-				if (user_info->item6 != -1) {
-					client->SetItem(5, static_cast<ITEM_TYPE>(user_info->item6 + 1), 0, true);
+				if (user_info.item6 != -1) {
+					client->SetItem(5, static_cast<ITEM_TYPE>(user_info.item6 + 1), 0, true);
 					SC_ITEM_GET_PACKET p;
 					p.size = sizeof(p);
 					p.type = SC_ITEM_GET;
 					p.inven_num = 5;
-					p.item_type = static_cast<ITEM_TYPE>(user_info->item6 + 1);
+					p.item_type = static_cast<ITEM_TYPE>(user_info.item6 + 1);
 					p.x = client->GetPosX();
 					p.y = client->GetPosY();
 					client->GetSession()->SendPacket(&p);
@@ -177,27 +178,30 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CClient* client)
 		stat->SetMaxExp(100);
 		stat->SetMaxMp(100);
 		stat->SetMp(100);
-		{
-			lock_guard<mutex> ll{ client->m_StateLock };
-			client->SetState(CL_STATE::ST_INGAME);
-		}
+		client->SetState(CL_STATE::ST_INGAME);
 		client->GetSession()->SendLoginInfoPacket(client->GetID(), client->GetPosX(), client->GetPosY(), p->name, stat);
-		for (auto& pl : CNetworkMgr::GetInstance()->GetAllObject()) {
-			CClient* cl = reinterpret_cast<CClient*>(pl);
+
+		int sectionX = client->GetPosX() / SECTION_SIZE;
+		int sectionY = client->GetPosY() / SECTION_SIZE;
+		client->SetSection(sectionX, sectionY);
+		GameUtil::RegisterToSection(-1, -1, sectionY, sectionX, client->GetID());
+		client->SetSection(client->GetPosX(), client->GetPosY());
+
+		std::unordered_set<int> viewList;
+		client->CheckSection(viewList);
+		for (auto id : viewList)
+		{
+			if (id < MAX_USER)
 			{
-				lock_guard<mutex> ll(pl->m_StateLock);
-				if (CL_STATE::ST_INGAME != cl->GetState())
-					continue;
+				auto otherClient = static_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(id));
+				otherClient->AddObjectToView(id);
 			}
-			if (pl->GetID() == client->GetID())
-				continue;
-			if (false == client->CanSee(pl->GetID()))
-				continue;
-			if (pl->GetID() < MAX_USER)
-				cl->AddObjectToView(client->GetID());
 			else
-				reinterpret_cast<CNpc*>(pl)->WakeUp(client->GetID());
-			client->AddObjectToView(pl->GetID());
+			{
+				static_cast<CNpc*>(CNetworkMgr::GetInstance()->GetCObject(id))->WakeUp(client->GetID());
+			}
+			client->AddObjectToView(id);
+			
 		}
 	}
 }
