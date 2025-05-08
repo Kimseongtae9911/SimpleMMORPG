@@ -334,7 +334,7 @@ void CClient::CheckSection(std::unordered_set<int>& viewList)
 {
 	viewList.reserve(10);
 	const auto InsertToViewList = [this, &viewList](int sectionX, int sectionY) {
-		for (int id : GameUtil::GetSectionObjects(m_sectionY, m_sectionX)) {
+		for (int id : GameUtil::GetSectionObjects(sectionY, sectionX)) {
 			if (id == m_ID)
 				continue;
 
@@ -346,37 +346,37 @@ void CClient::CheckSection(std::unordered_set<int>& viewList)
 	InsertToViewList(m_sectionX, m_sectionY);
 
 	//Right
-	if (m_PosX % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionX != SECTION_NUM - 1) {
+	if (m_sectionX <= SECTION_NUM - 2) {
 		InsertToViewList(m_sectionX + 1, m_sectionY);
 
 		//RightDown
-		if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1)
+		if (m_sectionY <= SECTION_NUM - 2)
 			InsertToViewList(m_sectionX + 1, m_sectionY + 1);
 
 		//RightUp
-		else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0)
+		else if (m_sectionY >= 1)
 			InsertToViewList(m_sectionX + 1, m_sectionY - 1);	
 
 	}
 	//Left
-	else if (m_PosX % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionX != 0) {
+	else if (m_sectionX >= 1) {
 		InsertToViewList(m_sectionX - 1, m_sectionY);
 
 		//LeftDown
-		if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1)
+		if (m_sectionY <= SECTION_NUM - 2)
 			InsertToViewList(m_sectionX - 1, m_sectionY + 1);
 
 		//LeftUp
-		else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0)
+		else if (m_sectionY >= 1)
 			InsertToViewList(m_sectionX - 1, m_sectionY - 1);
 	}
 
 	//Down
-	if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1)
+	if (m_sectionY <= SECTION_NUM - 2)
 		InsertToViewList(m_sectionX, m_sectionY + 1);
 	
 	//Up
-	else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0)
+	else if (m_sectionY >= 1)
 		InsertToViewList(m_sectionX, m_sectionY - 1);
 }
 
@@ -435,7 +435,7 @@ void CClient::Logout()
 #endif
 
 	for (auto& p_id : m_viewList) {
-		if (m_ID >= MAX_USER)
+		if (p_id >= MAX_USER)
 			continue;
 
 		auto pl = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(p_id));

@@ -185,7 +185,6 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CClient* client)
 		int sectionY = client->GetPosY() / SECTION_SIZE;
 		client->SetSection(sectionX, sectionY);
 		GameUtil::RegisterToSection(-1, -1, sectionY, sectionX, client->GetID());
-		client->SetSection(client->GetPosX(), client->GetPosY());
 
 		std::unordered_set<int> viewList;
 		client->CheckSection(viewList);

@@ -117,7 +117,7 @@ void CNetworkMgr::IOCPFunc()
 		BOOL ret = GetQueuedCompletionStatus(m_iocp, &num_bytes, &key, &over, INFINITE);
 		COverlapEx* over_ex = reinterpret_cast<COverlapEx*>(over);
 		if (FALSE == ret) {
-			if (over_ex->m_comp_type == OP_TYPE::OP_ACCEPT) cout << "Accept Error";
+			if (over_ex->m_comp_type == OP_TYPE::OP_ACCEPT) cout << "Accept Error" << endl;
 			else {
 				cout << "GQCS Error on client[" << key << "]\n";
 				Disconnect(static_cast<int>(key));
@@ -213,12 +213,13 @@ void CNetworkMgr::Accept(int id, int bytes, COverlapEx* over_ex)
 		return;
 	}
 	int client_id = m_idMap.find(m_clientSock)->second;
-	{
-		lock_guard<mutex> ll(m_objects[client_id]->m_StateLock);
-		reinterpret_cast<CClient*>(m_objects[client_id])->SetState(CL_STATE::ST_ALLOC);
-	}
 	CreateIoCompletionPort(reinterpret_cast<HANDLE>(m_clientSock), m_iocp, client_id, 0);
-	reinterpret_cast<CClient*>(m_objects[client_id])->PlayerAccept(client_id, m_clientSock);
+
+	auto client = static_cast<CClient*>(m_objects[client_id]);
+	client->GetJobQueue().PushJob([client, client_id, socket = std::move(m_clientSock)]() {
+		client->SetState(CL_STATE::ST_ALLOC);
+		client->PlayerAccept(client_id, socket);
+		});	
 
 	if (!m_socketpool.empty()) {
 		m_clientSock = m_socketpool.front();
@@ -256,6 +257,8 @@ void CNetworkMgr::PlayerHeal(int id, int bytes, COverlapEx* over_ex)
 	client->GetJobQueue().PushJob([client]() {
 		client->Heal();
 		});
+
+	OverlapPool::RegisterToPool(over_ex);
 }
 
 void CNetworkMgr::NpcMove(int id, int bytes, COverlapEx* over_ex)
@@ -268,6 +271,8 @@ void CNetworkMgr::PowerUpRollBack(int id, int bytes, COverlapEx* over_ex)
 {
 	CClient* client = reinterpret_cast<CClient*>(m_objects[id]);
 	m_objects[id]->GetStat()->SetPower(m_objects[id]->GetStat()->GetPower() - over_ex->m_ai_target_obj);
+
+	OverlapPool::RegisterToPool(over_ex);
 }
 
 void CNetworkMgr::Recv(int id, int bytes, COverlapEx* over_ex)

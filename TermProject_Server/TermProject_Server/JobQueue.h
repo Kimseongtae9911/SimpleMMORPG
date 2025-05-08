@@ -38,7 +38,7 @@ public:
     }
 
 private:
-    concurrency::concurrent_priority_queue<JobRef> m_jobQueue;
+    concurrency::concurrent_priority_queue<JobRef, JobComparer> m_jobQueue;
 };
 
 
@@ -46,10 +46,16 @@ class CClient;
 class PacketJobQueue
 {
 public:
+    PacketJobQueue();
+    ~PacketJobQueue();
+
     void AddSessionQueue(CClient* object);
 
     void ProcessJob();
 
 private:
+    class Impl;
+    Impl* m_impl = nullptr;
+
     concurrency::concurrent_priority_queue<CClient*> m_jobQueue;
 };

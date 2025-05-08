@@ -33,6 +33,7 @@ extern "C" {
 //#define DATABASE
 #define WITH_VIEW
 #define WITH_SECTION
+//#define CHECK_NPC_ACTIVE
 
 using namespace std;
 

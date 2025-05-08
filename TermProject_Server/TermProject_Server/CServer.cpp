@@ -32,11 +32,11 @@ void CServer::Run()
 {
 	m_workers.reserve(3);
 	m_networkThreads.reserve(3);
-	for (unsigned int i = 0; i < 3; ++i) {
+	for (unsigned int i = 0; i < 5; ++i) {
 		m_networkThreads.emplace_back([this]() {CNetworkMgr::GetInstance()->IOCPFunc(); });
 	}
 
-	for (unsigned int i = 0; i < 3; ++i) {
+	for (unsigned int i = 0; i < 5; ++i) {
 		m_workers.emplace_back([]() {GPacketJobQueue->ProcessJob(); });
 	}
 

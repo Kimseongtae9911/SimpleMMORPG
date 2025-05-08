@@ -9,6 +9,8 @@ class CItem;
 class CClient : public CObject
 {
 public:
+	using TimePoint = std::chrono::high_resolution_clock::time_point;
+
 	CClient();
 	virtual ~CClient();
 
@@ -48,6 +50,9 @@ public:
 	bool IsInQueue() const { return m_isEnqueued.load(); }
 	bool IsDisconnected() const { return m_isDisconnected; }
 	void SetDisconnected() { m_isDisconnected.store(true); }
+	void SetRegisterTime() { m_RegisterTime = std::chrono::high_resolution_clock::now(); }
+	TimePoint GetRegisterTime() const { return m_RegisterTime; }
+
 	void Logout();
 
 public:
@@ -66,5 +71,11 @@ private:
 	std::atomic_bool m_isDisconnected = false;
 	std::atomic_bool m_isEnqueued = false;
 	JobQueue m_jobQueue;
+	TimePoint m_RegisterTime;
 };
 
+struct CClientTimeComparer {
+	bool operator()(CClient* lhs, CClient* rhs) const {
+		return lhs->GetRegisterTime() > rhs->GetRegisterTime();
+	}
+};

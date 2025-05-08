@@ -78,8 +78,26 @@ void CNpc::Chase()
 
 #ifdef WITH_VIEW
 #ifdef WITH_SECTION
+	int sectionX = static_cast<int>(m_PosX / SECTION_SIZE);
+	int sectionY = static_cast<int>(m_PosY / SECTION_SIZE);
+
+	if (m_sectionX != sectionX || m_sectionY != sectionY) {
+		GameUtil::RegisterToSection(m_sectionY, m_sectionX, sectionY, sectionX, m_ID);
+		m_sectionX = sectionX;
+		m_sectionY = sectionY;
+	}
+
 	std::unordered_set<int> viewList;
 	CheckSection(viewList);
+	if (viewList.empty())
+	{
+#ifdef CHECK_NPC_ACTIVE
+		--GActiveNpc;
+#endif
+		m_active = false;
+		return;
+	}
+
 	ViewListUpdate(viewList);
 #else
 	m_ViewLock.lock_shared();
@@ -164,13 +182,14 @@ void CNpc::RandomMove()
 	unordered_set<int> viewList;
 	CheckSection(viewList);
 	if (viewList.size() == 0) {
+#ifdef CHECK_NPC_ACTIVE
+		--GActiveNpc;
+#endif
 		m_active = false;
 		return;
 	}
 
 	for (int id : viewList) {
-		CClient* client = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(id));
-		client->GetSession()->SendMovePacket(m_ID, m_PosX, m_PosY, lastMoveTime);
 		if (MONSTER_TYPE::AGRO == m_monType && Agro(id)) {
 			m_target = id;
 			m_state = NPC_STATE::CHASE;
@@ -264,6 +283,9 @@ void CNpc::WakeUp(int waker)
 		return;
 
 	m_active = true;
+#ifdef CHECK_NPC_ACTIVE
+	++GActiveNpc;
+#endif
 
 	TIMER_EVENT ev{ m_ID, chrono::system_clock::now(), EV_RANDOM_MOVE, 0 };
 	CNetworkMgr::GetInstance()->RegisterEvent(ev);
@@ -286,36 +308,36 @@ void CNpc::CheckSection(std::unordered_set<int>& viewList)
 	InsertToViewList(m_sectionX, m_sectionY);
 
 	//Right
-	if (m_PosX % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionX != SECTION_NUM - 1) {
+	if (m_sectionX <= SECTION_NUM - 2) {
 		InsertToViewList(m_sectionX + 1, m_sectionY);
 
 		//RightDown
-		if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1)
+		if (m_sectionY <= SECTION_NUM - 2)
 			InsertToViewList(m_sectionX + 1, m_sectionY + 1);
 		
 		//RightUp
-		else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0)
+		else if (m_sectionY >= 1)
 			InsertToViewList(m_sectionX + 1, m_sectionY - 1);
 	}
 	//Left
-	else if (m_PosX % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionX != 0) {
+	else if (m_sectionX >= 1) {
 		InsertToViewList(m_sectionX - 1, m_sectionY);
 
 		//LeftDown
-		if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1)
+		if (m_sectionY <= SECTION_NUM - 2)
 			InsertToViewList(m_sectionX - 1, m_sectionY + 1);
 
 		//LeftUp
-		else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0)
+		else if (m_sectionY >= 1)
 			InsertToViewList(m_sectionX - 1, m_sectionY - 1);
 	}
 
 	//Down
-	if (m_PosY % SECTION_SIZE >= SECTION_SIZE / 2 && m_sectionY != SECTION_NUM - 1)
+	if (m_sectionY <= SECTION_NUM - 2)
 		InsertToViewList(m_sectionX, m_sectionY + 1);
 	
 	//Up
-	else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0)
+	else if (m_sectionY >= 1)
 		InsertToViewList(m_sectionX, m_sectionY - 1);
 }
 
