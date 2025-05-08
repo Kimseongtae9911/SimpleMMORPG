@@ -319,7 +319,7 @@ void CNpc::CheckSection(std::unordered_set<int>& viewList)
 			InsertToViewList(m_sectionX + 1, m_sectionY + 1);
 		
 		//RightUp
-		else if (m_sectionY >= 1)
+		if (m_sectionY >= 1)
 			InsertToViewList(m_sectionX + 1, m_sectionY - 1);
 	}
 	//Left
@@ -331,7 +331,7 @@ void CNpc::CheckSection(std::unordered_set<int>& viewList)
 			InsertToViewList(m_sectionX - 1, m_sectionY + 1);
 
 		//LeftUp
-		else if (m_sectionY >= 1)
+		if (m_sectionY >= 1)
 			InsertToViewList(m_sectionX - 1, m_sectionY - 1);
 	}
 
@@ -340,7 +340,7 @@ void CNpc::CheckSection(std::unordered_set<int>& viewList)
 		InsertToViewList(m_sectionX, m_sectionY + 1);
 	
 	//Up
-	else if (m_sectionY >= 1)
+	if (m_sectionY >= 1)
 		InsertToViewList(m_sectionX, m_sectionY - 1);
 }
 
