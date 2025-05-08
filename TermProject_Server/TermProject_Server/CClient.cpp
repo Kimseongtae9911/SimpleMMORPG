@@ -359,7 +359,7 @@ void CClient::CheckSection(std::unordered_set<int>& viewList)
 
 	}
 	//Left
-	else if (m_sectionX >= 1) {
+	if (m_sectionX >= 1) {
 		InsertToViewList(m_sectionX - 1, m_sectionY);
 
 		//LeftDown

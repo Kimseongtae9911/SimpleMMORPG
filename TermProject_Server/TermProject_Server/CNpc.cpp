@@ -300,7 +300,7 @@ void CNpc::CheckSection(std::unordered_set<int>& viewList)
 
 	auto InsertToViewList = [this, &viewList](int sectionX, int sectionY) {
 		for (int id : GameUtil::GetSectionObjects(sectionY, sectionX)) {
-			if (id >= MAX_USER || id == m_ID)
+			if (id >= MAX_USER)
 				continue;
 			if (CanSee(id))
 				viewList.insert(id);
@@ -323,7 +323,7 @@ void CNpc::CheckSection(std::unordered_set<int>& viewList)
 			InsertToViewList(m_sectionX + 1, m_sectionY - 1);
 	}
 	//Left
-	else if (m_sectionX >= 1) {
+	if (m_sectionX >= 1) {
 		InsertToViewList(m_sectionX - 1, m_sectionY);
 
 		//LeftDown
@@ -388,7 +388,7 @@ void CNpc::Update()
 	}
 
 	if (m_state == NPC_STATE::ATTACK) {
-		Attack();
+		//Attack();
 	}
 	else if (m_state == NPC_STATE::CHASE) {
 		Chase();
