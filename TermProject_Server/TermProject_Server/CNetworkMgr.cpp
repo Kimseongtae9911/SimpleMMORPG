@@ -220,6 +220,7 @@ void CNetworkMgr::Accept(int id, int bytes, COverlapEx* over_ex)
 		client->SetState(CL_STATE::ST_ALLOC);
 		client->PlayerAccept(client_id, socket);
 		});	
+	GPacketJobQueue->AddSessionQueue(client);
 
 	if (!m_socketpool.empty()) {
 		m_clientSock = m_socketpool.front();
@@ -257,6 +258,7 @@ void CNetworkMgr::PlayerHeal(int id, int bytes, COverlapEx* over_ex)
 	client->GetJobQueue().PushJob([client]() {
 		client->Heal();
 		});
+	GPacketJobQueue->AddSessionQueue(client);
 
 	OverlapPool::RegisterToPool(over_ex);
 }
@@ -335,4 +337,5 @@ void CNetworkMgr::Disconnect(int id)
 	pc->GetJobQueue().PushJob([pc]() {
 		pc->Logout();
 		});
+	GPacketJobQueue->AddSessionQueue(pc);
 }

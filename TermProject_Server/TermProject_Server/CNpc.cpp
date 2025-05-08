@@ -35,7 +35,7 @@ CNpc::~CNpc()
 
 void CNpc::Attack()
 {
-	CObject* target = CNetworkMgr::GetInstance()->GetCObject(m_target);
+	auto* target = static_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(m_target));
 	if (abs(m_PosX - target->GetPosX()) + abs(m_PosY - target->GetPosY()) > 1) {
 		if (!Agro(m_target)) {
 			m_state = NPC_STATE::PATROL;
@@ -44,7 +44,10 @@ void CNpc::Attack()
 			m_state = NPC_STATE::CHASE;
 	}
 	else {
-		target->Damaged(m_stat->GetPower(), m_ID);
+		target->GetJobQueue().PushJob([this, target]() {
+			target->Damaged(m_stat->GetPower(), m_ID);
+			});
+		GPacketJobQueue->AddSessionQueue(target);
 
 		ChatUtil::SendDamageMsg(m_target, m_stat->GetPower(), m_name);
 	}
