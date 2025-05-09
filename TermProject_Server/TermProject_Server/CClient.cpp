@@ -263,7 +263,13 @@ void CClient::Move(char dir)
 		if (newView.end() == newView.find(pl)) {
 			RemoveObjectFromView(pl);
 			if (pl < MAX_USER)
-				reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl))->RemoveObjectFromView(m_ID);
+			{
+				auto otherClient = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl));
+				otherClient->GetJobQueue().PushJob([this, otherClient]() {
+					otherClient->RemoveObjectFromView(m_ID);
+					});
+				GPacketJobQueue->AddSessionQueue(otherClient);
+			}
 		}
 	}
 #else
@@ -393,6 +399,54 @@ bool CClient::Damaged(int power, int attackID)
 
 	if (m_stat->Damaged(power)) {	
 		SetPos(48, 47);
+
+		int sectionX = static_cast<int>(m_PosX / SECTION_SIZE);
+		int sectionY = static_cast<int>(m_PosY / SECTION_SIZE);
+
+		if (m_sectionX != sectionX || m_sectionY != sectionY) {
+			GameUtil::RegisterToSection(m_sectionY, m_sectionX, sectionY, sectionX, m_ID);
+			m_sectionX = sectionX;
+			m_sectionY = sectionY;
+		}
+
+		unordered_set<int> oldView = m_viewList;
+		std::unordered_set<int> newView;
+		CheckSection(newView);
+
+		for (auto& pl : newView) {
+			CObject* cpl = CNetworkMgr::GetInstance()->GetCObject(pl);
+			if (pl < MAX_USER) {
+				CClient* cl = reinterpret_cast<CClient*>(cpl);
+
+				cl->GetJobQueue().PushJob([this, cl]() {
+					// 시야에 있다면 패킷 전송, 없다면 시야에 추가
+					const auto& viewList = cl->GetViewList();
+					viewList.end() != viewList.find(m_ID) ? cl->GetSession()->SendMovePacket(m_ID, m_PosX, m_PosY, lastMoveTime) : cl->AddObjectToView(m_ID);
+					});
+				GPacketJobQueue->AddSessionQueue(cl);
+			}
+			else {
+				reinterpret_cast<CNpc*>(cpl)->WakeUp(m_ID);
+			}
+
+			if (oldView.find(pl) == oldView.end())
+				AddObjectToView(pl);
+		}
+
+		for (auto& pl : oldView) {
+			if (newView.end() == newView.find(pl)) {
+				RemoveObjectFromView(pl);
+				if (pl < MAX_USER)
+				{
+					auto otherClient = reinterpret_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl));
+					otherClient->GetJobQueue().PushJob([this, otherClient]() {
+						otherClient->RemoveObjectFromView(m_ID);
+						});
+					GPacketJobQueue->AddSessionQueue(otherClient);
+				}
+			}
+		}
+
 		m_session->SendMovePacket(m_ID, 48, 47, lastMoveTime);
 		m_session->SendStatChangePacket(reinterpret_cast<CClientStat*>(m_stat.get()));
 

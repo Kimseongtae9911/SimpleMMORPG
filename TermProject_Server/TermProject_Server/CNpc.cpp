@@ -338,10 +338,10 @@ void CNpc::CheckSection(std::unordered_set<int>& viewList)
 	//Down
 	if (m_sectionY <= SECTION_NUM - 2)
 		InsertToViewList(m_sectionX, m_sectionY + 1);
-	
+
 	//Up
 	if (m_sectionY >= 1)
-		InsertToViewList(m_sectionX, m_sectionY - 1);
+		InsertToViewList(m_sectionX, m_sectionY - 1);	
 }
 
 bool CNpc::Damaged(int power, int attackID)
@@ -388,7 +388,7 @@ void CNpc::Update()
 	}
 
 	if (m_state == NPC_STATE::ATTACK) {
-		//Attack();
+		Attack();
 	}
 	else if (m_state == NPC_STATE::CHASE) {
 		Chase();
