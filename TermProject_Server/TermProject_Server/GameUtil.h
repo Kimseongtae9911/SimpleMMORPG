@@ -3,10 +3,75 @@
 constexpr int SECTION_SIZE = VIEW_RANGE * 2;
 constexpr int SECTION_NUM = static_cast<int>((W_WIDTH / SECTION_SIZE + 1));
 
-struct Section {
-	shared_mutex sectionLock;
-	unordered_set<int> objects;
+class Section {
+public:
+    using ObjectSet = std::unordered_set<int>;
+
+    Section() {
+        objects.store(std::make_shared<ObjectSet>());
+		m_objectPool.push(std::make_shared<ObjectSet>());
+    }
+
+    void Insert(int id) {
+        while (true) {
+            auto current = objects.load();
+            if (current->find(id) != current->end())
+                return;
+
+            std::shared_ptr<ObjectSet> newSet = nullptr;
+			if (!m_objectPool.try_pop(newSet))
+                newSet = std::make_shared<ObjectSet>();
+
+            *newSet = *current;
+            newSet->insert(id);
+
+            if (objects.compare_exchange_weak(current, newSet)) {
+                current->clear();
+				m_objectPool.push(current);
+                break;
+            }
+            else {
+				newSet->clear();
+                m_objectPool.push(newSet);
+            }
+        }
+    }
+
+    void Erase(int id) {
+        while (true) {
+            auto current = objects.load();
+            if (current->find(id) == current->end())
+                return;
+
+            std::shared_ptr<ObjectSet> newSet = nullptr;
+            if (!m_objectPool.try_pop(newSet))
+                newSet = std::make_shared<ObjectSet>();
+
+            *newSet = *current;
+            newSet->erase(id);
+
+            if (objects.compare_exchange_weak(current, newSet)) {
+                current->clear();
+                m_objectPool.push(current);
+                break;
+            }
+            else {
+                newSet->clear();
+                m_objectPool.push(newSet);
+            }
+        }
+    }
+
+    std::vector<int> GetActiveObjects() const {
+        auto snapshot = objects.load();
+        return std::vector<int>(snapshot->begin(), snapshot->end());
+    }
+
+private:
+    std::atomic<std::shared_ptr<ObjectSet>> objects;
+	tbb::concurrent_queue<std::shared_ptr<ObjectSet>> m_objectPool;
 };
+
 
 class GameUtil
 {
@@ -19,7 +84,7 @@ public:
 	static ITEM_TYPE GetItemTile(int x, int y) { return itemmap[x][y]; }
 	static void SetItemTile(int x, int y, ITEM_TYPE item) { itemmap[x][y] = item; }
 
-	static unordered_set<int> GetSectionObjects(int y, int x);
+	static std::vector<int> GetSectionObjects(int y, int x);
 	static void RegisterToSection(int beforeY, int berforeX, int y, int x, int id);
 
 private:

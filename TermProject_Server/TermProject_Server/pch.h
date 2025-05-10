@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <iostream>
 #include <fstream>
 #include <random>
@@ -15,6 +15,8 @@
 #include <stack>
 #include <string>
 #include <concurrent_priority_queue.h>
+#include <tbb/concurrent_hash_map.h>
+#include <tbb/concurrent_queue.h>
 #include <unordered_map>
 #include <functional>
 #include <memory>

@@ -46,23 +46,15 @@ bool GameUtil::CanMove(short x, short y)
 	return true;
 }
 
-unordered_set<int> GameUtil::GetSectionObjects(int y, int x)
+std::vector<int> GameUtil::GetSectionObjects(int y, int x)
 {
-	sections[y][x].sectionLock.lock_shared();
-	unordered_set<int> objects(sections[y][x].objects);
-	sections[y][x].sectionLock.unlock_shared();
-
-	return objects;
+	return sections[y][x].GetActiveObjects();
 }
 
 void GameUtil::RegisterToSection(int beforeY, int beforeX, int y, int x, int id)
 {
-	if (beforeX != -1) {
-		sections[beforeY][beforeX].sectionLock.lock();
-		sections[beforeY][beforeX].objects.erase(id);
-		sections[beforeY][beforeX].sectionLock.unlock();
-	}
-	sections[y][x].sectionLock.lock(); 
-	sections[y][x].objects.insert(id); 
-	sections[y][x].sectionLock.unlock();
+	if (beforeX != -1)
+		sections[beforeY][beforeX].Erase(id);
+
+	sections[y][x].Insert(id);
 }
