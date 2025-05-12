@@ -37,7 +37,7 @@ private:
 	bool IsValid(int x, int y);
 	bool IsUnBlocked(int x, int y);
 	double CalH(int x, int y, int destX, int destY);
-	void FindPath(Node node[MONSTER_VIEW * 2 + 1][MONSTER_VIEW * 2 + 1], int destX, int destY, int* x, int* y);
+	bool FindNextStep(Node node[MONSTER_VIEW * 2 + 1][MONSTER_VIEW * 2 + 1], int x, int y, int* resultx, int* resulty, int offsetX, int offsetY);
 	void ViewListUpdate(const unordered_set<int>& viewList);
 
 public:

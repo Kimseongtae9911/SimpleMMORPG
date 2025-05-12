@@ -8,6 +8,7 @@ public:
 };
 
 PacketJobQueue::PacketJobQueue() {
+    std::cout << "JobQueue Init" << std::endl;
     m_impl = new Impl();
 }
 
@@ -30,9 +31,7 @@ void PacketJobQueue::ProcessJob()
     {
         CClient* client = nullptr;
         while (m_jobQueue.try_pop(client))
-        {
-            client->UnmarkInQueue();
-
+        {           
             if (client->IsDisconnected())
             {
                 //CUserMgr::GetInstance()->ClientReset(client->GetID());
@@ -40,6 +39,8 @@ void PacketJobQueue::ProcessJob()
             }
 
             client->GetJobQueue().ProcessJob();
+            client->GetJobQueue().JobQueueSize() > 0 ? m_jobQueue.push(client) : client->UnmarkInQueue();
+
         }
     }
 }

@@ -47,14 +47,22 @@ bool GameUtil::CanMove(short x, short y)
 }
 
 std::vector<int> GameUtil::GetSectionObjects(int y, int x)
-{
-	return sections[y][x].GetActiveObjects();
+{	
+	sections[y][x].sectionLock.lock_shared();
+	std::vector<int> objects(sections[y][x].objects.begin(), sections[y][x].objects.end());
+	sections[y][x].sectionLock.unlock_shared();
+
+	return objects;
 }
 
 void GameUtil::RegisterToSection(int beforeY, int beforeX, int y, int x, int id)
 {
-	if (beforeX != -1)
-		sections[beforeY][beforeX].Erase(id);
-
-	sections[y][x].Insert(id);
+	if (beforeX != -1) {
+		sections[beforeY][beforeX].sectionLock.lock();
+		sections[beforeY][beforeX].objects.erase(id);
+		sections[beforeY][beforeX].sectionLock.unlock();
+	}
+	sections[y][x].sectionLock.lock();
+	sections[y][x].objects.insert(id);
+	sections[y][x].sectionLock.unlock();
 }

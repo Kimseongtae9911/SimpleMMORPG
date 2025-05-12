@@ -535,6 +535,9 @@ void CClient::AddObjectToView(int c_id)
 
 void CClient::RemoveObjectFromView(int c_id)
 {
+	if (c_id == m_ID)
+		return;
+
 	const auto it = m_viewList.find(c_id);
 	if (it == m_viewList.end())
 		return;

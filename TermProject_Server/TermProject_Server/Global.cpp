@@ -2,19 +2,5 @@
 
 #include "JobQueue.h"
 
-PacketJobQueue* GPacketJobQueue = nullptr;
+PacketJobQueue* GPacketJobQueue = new PacketJobQueue();
 std::atomic_int GActiveNpc = 0;
-
-class Global
-{
-public:
-	Global()
-	{
-		GPacketJobQueue = new PacketJobQueue();
-	}
-
-	~Global()
-	{
-		delete GPacketJobQueue;
-	}
-} Global;

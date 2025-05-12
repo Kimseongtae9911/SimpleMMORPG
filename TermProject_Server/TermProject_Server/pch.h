@@ -102,8 +102,9 @@ struct WeightPos {
 };
 
 struct Node {
+	int x, y;
 	int parentX, parentY;
-	double h, f, g;
+	double f = INF, g = INF, h = INF;
 };
 
 #pragma pack (push, 1)

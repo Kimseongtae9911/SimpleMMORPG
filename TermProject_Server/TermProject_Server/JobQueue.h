@@ -37,6 +37,8 @@ public:
         }
     }
 
+    size_t JobQueueSize() const { return m_jobQueue.size(); }
+
 private:
     concurrency::concurrent_priority_queue<JobRef, JobComparer> m_jobQueue;
 };

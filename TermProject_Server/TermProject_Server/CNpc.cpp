@@ -290,6 +290,9 @@ void CNpc::WakeUp(int waker)
 	++GActiveNpc;
 #endif
 
+	m_viewList.clear();
+	CheckSection(m_viewList);
+
 	TIMER_EVENT ev{ m_ID, chrono::system_clock::now(), EV_RANDOM_MOVE, 0 };
 	CNetworkMgr::GetInstance()->RegisterEvent(ev);
 }
@@ -412,7 +415,17 @@ bool CNpc::AStar(int startX, int startY, int destX, int destY, int* resultx, int
 	if (!IsUnBlocked(startX, startY) || !IsUnBlocked(destX, destY)) return false;
 	if (IsDest(startX, startY, destX, destY)) return false;
 
-	bool closedList[MONSTER_VIEW * 2 + 1][MONSTER_VIEW * 2 + 1] = {};
+	const int gridSize = MONSTER_VIEW * 2 + 1;
+	Node node[gridSize][gridSize];
+	bool closedList[gridSize][gridSize] = {};
+
+	int offsetX = startX;
+	int offsetY = startY;
+
+	int startLocalX = MONSTER_VIEW;
+	int startLocalY = MONSTER_VIEW;
+	int destLocalX = MONSTER_VIEW + (destX - startX);
+	int destLocalY = MONSTER_VIEW + (destY - startY);
 
 	for (int i = 0; i < MONSTER_VIEW; ++i) {
 		for (int j = 0; j < MONSTER_VIEW; ++j) {
@@ -420,69 +433,65 @@ bool CNpc::AStar(int startX, int startY, int destX, int destY, int* resultx, int
 		}
 	}
 
-	Node node[MONSTER_VIEW * 2 + 1][MONSTER_VIEW * 2 + 1] = {};
-
-	for (int i = 0; i < MONSTER_VIEW * 2 + 1; ++i) {
-		for (int j = 0; j < MONSTER_VIEW * 2 + 1; ++j) {
-			node[i][j].f = node[i][j].g = node[i][j].h = INF;
-			node[i][j].parentX = node[i][j].parentY = -1;
+	for (int i = 0; i < gridSize; ++i) {
+		for (int j = 0; j < gridSize; ++j) {
+			node[i][j] = { i, j, -1, -1, INF, INF, INF };
 		}
 	}
 
-	int offsetX = startX;
-	int offsetY = startY;
-	destX = MONSTER_VIEW + (destX - startX);
-	destY = MONSTER_VIEW + (destY - startY);
-	startX = MONSTER_VIEW;
-	startY = MONSTER_VIEW;
+	node[startLocalY][startLocalX].f = 0.0;
+	node[startLocalY][startLocalX].g = 0.0;
+	node[startLocalY][startLocalX].h = 0.0;
+	node[startLocalY][startLocalX].parentX = startLocalX;
+	node[startLocalY][startLocalX].parentY = startLocalY;
 
-	node[startY][startX].f = node[startY][startX].g = node[startY][startX].h = 0.f;
-	node[startY][startX].parentX = startX;
-	node[startY][startX].parentY = startY;
-
-	priority_queue<WeightPos> openList;
-
-	openList.push({ 0.f, startX, startY });
+	std::priority_queue<WeightPos> openList;
+	openList.push({ 0.0, startLocalX, startLocalY });
 
 	while (!openList.empty()) {
-		WeightPos wp = openList.top();
+		auto [_, x, y] = openList.top();
 		openList.pop();
-
-		int x = wp.x;
-		int y = wp.y;
 
 		closedList[y][x] = true;
 
-		double nf, ng, nh;
-
-		for (int i = 0; i < 4; ++i) {
+		for (int i = 0; i < 4; ++i) 
+		{
 			int ny = y + dy1[i];
 			int nx = x + dx1[i];
 
-			if (IsValid(nx, ny)) {
-				if (IsDest(nx, ny, destX, destY)) {
-					node[ny][nx].parentX = x;
-					node[ny][nx].parentY = y;
-					FindPath(node, destX, destY, resultx, resulty);
-					*resultx += (offsetX - MONSTER_VIEW);
-					*resulty += (offsetY - MONSTER_VIEW);
-					return true;
-				}
-				else if (!closedList[ny][nx] && IsUnBlocked(nx, ny)) {
-					ng = node[y][x].g + 1.0f;
-					nh = CalH(nx, ny, destX, destY);
-					nf = ng + nh;
+			if (!IsValid(nx, ny) || closedList[ny][nx])
+				continue;
 
-					if (node[ny][nx].f == INF || node[ny][nx].f > nf) {
-						node[ny][nx].f = nf;
-						node[ny][nx].g = ng;
-						node[ny][nx].h = nh;
-						node[ny][nx].parentX = x;
-						node[ny][nx].parentY = y;
+			int globalX = nx + (offsetX - MONSTER_VIEW);
+			int globalY = ny + (offsetY - MONSTER_VIEW);
 
-						openList.push({ nf, nx, ny });
-					}
-				}
+			if (!IsUnBlocked(globalX, globalY))
+				continue;
+
+			if (IsDest(globalX, globalY, destX, destY)) 
+			{
+				node[ny][nx].parentX = x;
+				node[ny][nx].parentY = y;
+				node[ny][nx].g = node[y][x].g + 1.0;
+				node[ny][nx].h = 0.0;
+				node[ny][nx].f = node[ny][nx].g;
+
+				return FindNextStep(node, nx, ny, resultx, resulty, offsetX, offsetY);				
+			}
+
+			double newG = node[y][x].g + 1.0;
+			double newH = CalH(nx, ny, destLocalX, destLocalY);
+			double newF = newG + newH;
+
+			if (node[ny][nx].f > newF) 
+			{
+				node[ny][nx].f = newF;
+				node[ny][nx].g = newG;
+				node[ny][nx].h = newH;
+				node[ny][nx].parentX = x;
+				node[ny][nx].parentY = y;
+
+				openList.push({ newF, nx, ny });
 			}
 		}
 	}
@@ -516,21 +525,28 @@ double CNpc::CalH(int x, int y, int destX, int destY)
 	return (abs(x - destX) + abs(y - destY));
 }
 
-void CNpc::FindPath(Node node[MONSTER_VIEW * 2 + 1][MONSTER_VIEW * 2 + 1], int destX, int destY, int* x, int* y)
+bool CNpc::FindNextStep(Node node[MONSTER_VIEW * 2 + 1][MONSTER_VIEW * 2 + 1], int x, int y, int* resultx, int* resulty, int offsetX, int offsetY)
 {
-	stack<Node> s;
-	s.push({ destX, destY });
-	while (!(node[destY][destX].parentX == destX && node[destY][destX].parentY == destY)) {
-		int tempx = node[destY][destX].parentX;
-		int tempy = node[destY][destX].parentY;
-		destX = tempx;
-		destY = tempy;
-		s.push({ destX, destY });
+	std::stack<std::pair<int, int>> path;
+
+	while (!(node[y][x].parentX == x && node[y][x].parentY == y)) 
+	{
+		path.push({ x, y });
+		int px = node[y][x].parentX;
+		int py = node[y][x].parentY;
+		x = px;
+		y = py;
 	}
 
-	s.pop();
-	*x = s.top().parentX;
-	*y = s.top().parentY;
+	if (!path.empty()) 
+	{
+		auto [nx, ny] = path.top();
+		*resultx = nx + (offsetX - MONSTER_VIEW);
+		*resulty = ny + (offsetY - MONSTER_VIEW);
+		return true;
+	}
+
+	return false;
 }
 
 void CNpc::ViewListUpdate(const unordered_set<int>& viewList)
@@ -538,7 +554,7 @@ void CNpc::ViewListUpdate(const unordered_set<int>& viewList)
 	for (int pl : viewList) 
 	{
 		CClient* client = static_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(pl));
-
+	
 		client->GetJobQueue().PushJob([this, client]() {
 			const auto& viewList = client->GetViewList();
 			viewList.find(m_ID) != viewList.end() ? client->GetSession()->SendMovePacket(m_ID, m_PosX, m_PosY, lastMoveTime) : client->AddObjectToView(m_ID);
@@ -546,4 +562,17 @@ void CNpc::ViewListUpdate(const unordered_set<int>& viewList)
 
 		GPacketJobQueue->AddSessionQueue(client);
 	}
+
+	for (int id : m_viewList)
+	{
+		CClient* client = static_cast<CClient*>(CNetworkMgr::GetInstance()->GetCObject(id));
+
+		if (viewList.find(id) == viewList.end())
+			client->GetJobQueue().PushJob([this, client]() {
+			client->RemoveObjectFromView(m_ID);
+				});
+
+	}
+
+	m_viewList = viewList;
 }
