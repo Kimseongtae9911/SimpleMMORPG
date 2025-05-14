@@ -29,9 +29,9 @@ extern "C" {
 #pragma comment(lib, "MSWSock.lib")
 #pragma comment (lib, "lua54.lib")
 
-#define DATABASE
+//#define DATABASE
 #define WITH_VIEW
-#define WITH_SECTION
+//#define WITH_SECTION
 
 using namespace std;
 

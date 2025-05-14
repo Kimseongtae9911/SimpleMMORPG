@@ -351,7 +351,7 @@ unordered_set<int> CClient::CheckSection()
 			}
 		}
 		//RightUp
-		else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0) {
+		if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0) {
 			for (int id : GameUtil::GetSectionObjects(m_sectionY - 1, m_sectionX + 1)) {
 				if (id == m_ID)
 					continue;
@@ -362,7 +362,7 @@ unordered_set<int> CClient::CheckSection()
 
 	}
 	//Left
-	else if (m_PosX % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionX != 0) {
+	if (m_PosX % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionX != 0) {
 		for (int id : GameUtil::GetSectionObjects(m_sectionY, m_sectionX - 1)) {
 			if (id == m_ID)
 				continue;
@@ -379,7 +379,7 @@ unordered_set<int> CClient::CheckSection()
 			}
 		}
 		//LeftUp
-		else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0) {
+		if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0) {
 			for (int id : GameUtil::GetSectionObjects(m_sectionY - 1, m_sectionX - 1)) {
 				if (id == m_ID)
 					continue;
@@ -399,7 +399,7 @@ unordered_set<int> CClient::CheckSection()
 		}
 	}
 	//Up
-	else if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0) {
+	if (m_PosY % SECTION_SIZE < SECTION_SIZE / 2 && m_sectionY != 0) {
 		for (int id : GameUtil::GetSectionObjects(m_sectionY - 1, m_sectionX)) {
 			if (id == m_ID)
 				continue;

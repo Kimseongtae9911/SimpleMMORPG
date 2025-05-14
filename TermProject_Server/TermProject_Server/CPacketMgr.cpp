@@ -169,7 +169,9 @@ void CPacketMgr::LoginPacket(BASE_PACKET* packet, CClient* client)
 		}
 	}
 	else {
-		client->SetName(p->name);
+		char name[NAME_SIZE];
+		sprintf_s(name, NAME_SIZE, "%s%d", p->name, client->GetID());
+		client->SetName(name);
 		client->SetPos(rand() % W_WIDTH, rand() % W_HEIGHT);
 		CClientStat* stat = reinterpret_cast<CClientStat*>(client->GetStat());
 		stat->SetMaxHp(1000000);
